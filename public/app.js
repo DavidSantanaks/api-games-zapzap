@@ -2,6 +2,8 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   let state = null;
+  let activeGame = 'lol';
+  window.ggActiveGame = activeGame;
   let filter = 'all';
   let intervalDirty = false;
   let groupsLoaded = false;
@@ -11,7 +13,9 @@
   let lastMatchRender = '';
   let refreshing = false;
   let selectedScenario = 'feed';
+  let previewRequestId = 0;
   let dialogMatch = null;
+  let authDialogPlayer = null;
   const busyButtons = new WeakSet();
   const regions = { americas: 'Américas', europe: 'Europa', asia: 'Ásia', sea: 'Sudeste Asiático / Oceania' };
   const statusLabels = { pending: 'Na fila', sent: 'Enviada', failed: 'Falha no envio' };
@@ -70,12 +74,67 @@
       if (state && button.id === 'monitor-toggle') button.checked = !!state.settings.monitoringEnabled;
     }
   }
+  function setSectionControls(container, active) {
+    container.hidden = !active;
+    for (const control of container.querySelectorAll('input, select, button')) {
+      if (!busyButtons.has(control)) control.disabled = !active;
+    }
+  }
+  function syncFormMode() {
+    const isCs2 = activeGame === 'cs2';
+    setSectionControls($('lol-player-fields'), !isCs2);
+    setSectionControls($('cs2-player-fields'), isCs2);
+    $('game-name').required = !isCs2;
+    $('tag-line').required = !isCs2;
+    $('steam-id').required = isCs2;
+  }
   function syncDisabledStates() {
     const connect = $('connect-whatsapp');
     const check = $('check-now');
     connect.disabled = busyButtons.has(connect) || state?.whatsapp.state === 'connecting';
     check.disabled = busyButtons.has(check) || !!state?.monitor.running;
     $('refresh-groups').disabled = groupsLoading;
+    syncFormMode();
+  }
+  function scopedStats() {
+    if (state?.games?.[activeGame]?.stats) return state.games[activeGame].stats;
+    const players = (state?.players || []).filter(player => (player.game || 'lol') === activeGame);
+    const matches = (state?.matches || []).filter(match => (match.game || 'lol') === activeGame);
+    return {
+      players: players.length,
+      matches: matches.length,
+      sent: matches.filter(match => match.status === 'sent').length,
+      pending: matches.filter(match => match.status === 'pending' || match.status === 'failed').length,
+    };
+  }
+  function setActiveGame(game) {
+    if (game !== 'lol' && game !== 'cs2') return;
+    const changedGame = activeGame !== game;
+    activeGame = game;
+    window.ggActiveGame = game;
+    document.querySelectorAll('[data-game-tab]').forEach(tab => {
+      const current = tab.dataset.gameTab === game;
+      tab.classList.toggle('active', current);
+      tab.setAttribute('aria-pressed', String(current));
+    });
+    const isCs2 = game === 'cs2';
+    $('active-game-eyebrow').textContent = isCs2 ? 'COUNTER-STRIKE 2 · PREMIER E COMPETITIVO' : 'LEAGUE OF LEGENDS';
+    $('brand-subtitle').textContent = isCs2 ? 'DO BOMB PRO GRUPO' : 'DO NEXUS PRO GRUPO';
+    $('preview-game-tag').textContent = isCs2 ? 'EXEMPLO · CS2' : 'EXEMPLO';
+    $('players-footnote-text').textContent = isCs2
+      ? 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas Premier e Competitivo geram mensagens (dados via Steam e Leetify).'
+      : 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.';
+    const supportTab = $('preview-support-tab');
+    if (supportTab) supportTab.hidden = isCs2;
+    if (isCs2 && selectedScenario === 'support') selectedScenario = 'carry';
+    syncFormMode();
+    lastPlayerRender = '';
+    lastMatchRender = '';
+    if (state) render();
+    if (changedGame) {
+      loadPreview(selectedScenario);
+      document.dispatchEvent(new CustomEvent('game-tab-changed', { detail: { game } }));
+    }
   }
   async function refresh() {
     if (refreshing) return;
@@ -88,8 +147,10 @@
     finally { refreshing = false; }
   }
   function render() {
-    for (const key of ['players', 'matches', 'sent', 'pending']) $('stat-' + key).textContent = state.stats[key] ?? 0;
-    $('riot-notice').hidden = state.riotConfigured;
+    const stats = scopedStats();
+    for (const key of ['players', 'matches', 'sent', 'pending']) $('stat-' + key).textContent = stats[key] ?? 0;
+    $('riot-notice').hidden = activeGame !== 'lol' || !!state.riotConfigured;
+    $('cs2-notice').hidden = activeGame !== 'cs2' || !!state.cs2Configured;
     const active = !!state.settings.monitoringEnabled;
     const monitor = state.monitor || {};
     if (!busyButtons.has($('monitor-toggle'))) $('monitor-toggle').checked = active;
@@ -115,32 +176,62 @@
     node.append(el('p', '', copy));
     return node;
   }
+  function openCs2AuthDialog(player) {
+    authDialogPlayer = player;
+    $('cs2-auth-dialog-title').textContent = `Código Steam · ${player.gameName}`;
+    $('dialog-auth-code').value = '';
+    $('dialog-known-code').value = '';
+    $('cs2-auth-dialog').showModal();
+    $('dialog-auth-code').focus();
+  }
   function renderPlayers() {
-    const signature = JSON.stringify(state.players);
+    const players = (state.players || []).filter(player => (player.game || 'lol') === activeGame);
+    const signature = activeGame + ':' + JSON.stringify(players);
     if (signature === lastPlayerRender) return;
     lastPlayerRender = signature;
     const list = $('players-list');
     list.replaceChildren();
-    if (!state.players.length) {
-      list.append(emptyList('Quem vai ser o primeiro?', 'Adicione o Riot ID de um player para começar.', '◎', true));
+    if (!players.length) {
+      list.append(emptyList(
+        'Quem vai ser o primeiro?',
+        activeGame === 'cs2' ? 'Adicione o SteamID64 de um player para começar.' : 'Adicione o Riot ID de um player para começar.',
+        '◎',
+        true
+      ));
       return;
     }
-    for (const player of state.players) {
+    for (const player of players) {
+      const isCs2 = player.game === 'cs2';
       const row = el('div', 'player-row' + (player.enabled ? '' : ' player-paused'));
-      row.append(el('div', 'player-avatar', player.gameName.slice(0, 2).toUpperCase()));
+      row.append(el('div', 'player-avatar', (player.gameName || 'CS').slice(0, 2).toUpperCase()));
       const info = el('div', 'player-info');
       const name = el('span', 'player-name', player.gameName);
-      name.append(el('small', '', '#' + player.tagLine));
-      name.title = `${player.gameName}#${player.tagLine}`;
-      const region = el('span', 'player-region');
+      if (!isCs2 && player.tagLine) {
+        name.append(el('small', '', '#' + player.tagLine));
+        name.title = `${player.gameName}#${player.tagLine}`;
+      } else if (isCs2) {
+        name.title = `${player.gameName} (${player.steamId})`;
+      }
+      const subtitle = el('span', 'player-region');
       const dot = el('span', 'player-status-dot');
       dot.setAttribute('aria-hidden', 'true');
-      region.append(dot, document.createTextNode(`${player.enabled ? 'Monitorando' : 'Pausado'} · ${regions[player.region] || player.region}`));
-      info.append(name, region);
+      const detail = isCs2
+        ? `SteamID ${player.steamId} · ${player.hasShareAuth ? 'Código Steam ativo' : 'Histórico Leetify'}`
+        : (regions[player.region] || player.region);
+      subtitle.append(dot, document.createTextNode(`${player.enabled ? 'Monitorando' : 'Pausado'} · ${detail}`));
+      info.append(name, subtitle);
       if (player.lastError) info.append(el('span', 'player-error', player.lastError));
       info.title = player.lastCheckedAt ? 'Última consulta: ' + date(player.lastCheckedAt) : 'Aguardando consulta';
       row.append(info);
       const actions = el('div', 'player-actions');
+      if (isCs2) {
+        const authButton = el('button', 'player-action', 'Código');
+        authButton.type = 'button';
+        authButton.title = 'Configurar ou atualizar código de partida da Steam';
+        authButton.setAttribute('aria-label', 'Atualizar código Steam de ' + player.gameName);
+        authButton.addEventListener('click', () => openCs2AuthDialog(player));
+        actions.append(authButton);
+      }
       const toggle = el('button', 'player-action', player.enabled ? 'Pausar' : 'Retomar');
       toggle.type = 'button';
       toggle.setAttribute('aria-label', `${player.enabled ? 'Pausar' : 'Retomar'} ${player.gameName}`);
@@ -163,29 +254,48 @@
     }
   }
   function renderMatches() {
-    const signature = filter + JSON.stringify(state.matches);
+    const gameMatches = (state.matches || []).filter(match => (match.game || 'lol') === activeGame);
+    const signature = activeGame + ':' + filter + ':' + JSON.stringify(gameMatches);
     if (signature === lastMatchRender) return;
     lastMatchRender = signature;
-    $('history-count').textContent = `${state.matches.length} ${state.matches.length === 1 ? 'partida' : 'partidas'}`;
+    $('history-count').textContent = `${gameMatches.length} ${gameMatches.length === 1 ? 'partida' : 'partidas'}`;
     const list = $('matches-list');
-    const matches = state.matches.filter(match => filter === 'all' || match.status === filter);
+    const matches = gameMatches.filter(match => filter === 'all' || match.status === filter);
     list.replaceChildren();
     if (!matches.length) {
       list.append(filter === 'all' ? emptyList('A próxima partida já tem plateia.', 'Cadastre um player e ative o monitor. As novas partidas aparecem aqui.', '▤') : emptyList('Nenhuma partida por aqui.', 'As partidas com esse status aparecerão nesta lista.', '▤'));
       return;
     }
     for (const match of matches) {
+      const isCs2 = match.game === 'cs2';
+      const outcome = isCs2
+        ? (match.result || (match.win === true ? 'win' : match.win === false ? 'loss' : 'draw'))
+        : (match.win ? 'win' : 'loss');
+      const toneClass = outcome === 'win' ? '' : outcome === 'draw' ? ' draw' : ' loss';
+      const resultText = outcome === 'win' ? 'VITÓRIA' : outcome === 'draw' ? 'EMPATE' : 'DERROTA';
+      const tileSource = isCs2 ? (match.mapLabel || match.map || 'CS').replace(/^(?:de|cs)_/i, '') : (match.champion || '?');
       const row = el('div', 'match-row');
-      row.append(el('span', 'result-stripe' + (match.win ? '' : ' loss')), el('div', 'champion-tile', (match.champion || '?').slice(0, 2).toUpperCase()));
+      row.append(el('span', 'result-stripe' + toneClass), el('div', 'champion-tile', tileSource.slice(0, 2).toUpperCase()));
       const main = el('button', 'match-main match-info-button');
       main.type = 'button';
       main.setAttribute('aria-label', 'Ver mensagem da partida de ' + match.playerName);
       const top = el('div', 'match-topline');
       const name = el('span', 'match-name', match.playerName);
       name.title = match.playerName;
-      top.append(name, el('span', 'match-result' + (match.win ? '' : ' loss'), match.win ? 'VITÓRIA' : 'DERROTA'));
-      const mode = match.mode ? `${match.mode} · ` : '';
-      const sub = el('div', 'match-subline', `${mode}${match.champion} · ${match.lane || '—'} · ${date(match.endedAt)}`);
+      top.append(name, el('span', 'match-result' + toneClass, resultText));
+      let subText;
+      if (isCs2) {
+        const mapName = match.mapLabel || match.map || 'Mapa';
+        const scorePart = match.score ? ` · ${match.score}` : '';
+        const adrPart = match.adr !== null && match.adr !== undefined && Number.isFinite(Number(match.adr))
+          ? ` · ADR ${Number(match.adr).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
+          : '';
+        subText = `${match.mode || 'Premier'} · ${mapName}${scorePart}${adrPart} · ${date(match.endedAt)}`;
+      } else {
+        const mode = match.mode ? `${match.mode} · ` : '';
+        subText = `${mode}${match.champion} · ${match.lane || '—'} · ${date(match.endedAt)}`;
+      }
+      const sub = el('div', 'match-subline', subText);
       sub.title = sub.textContent;
       main.append(top, sub);
       main.addEventListener('click', () => openMatch(match));
@@ -260,7 +370,10 @@
     }
   }
   async function loadPreview(scenario) {
+    if (activeGame === 'cs2' && scenario === 'support') scenario = 'carry';
     selectedScenario = scenario;
+    const game = activeGame;
+    const reqId = ++previewRequestId;
     document.querySelectorAll('[data-scenario]').forEach(button => {
       const active = button.dataset.scenario === scenario;
       button.classList.toggle('active', active);
@@ -269,14 +382,14 @@
     $('preview-message').textContent = 'Gerando exemplo…';
     $('preview-kda-summary').textContent = 'Calculando o KDA do exemplo…';
     try {
-      const data = await api('/api/preview', 'POST', { scenario });
-      if (selectedScenario === scenario) {
+      const data = await api('/api/preview', 'POST', { game, scenario });
+      if (reqId === previewRequestId && activeGame === game && selectedScenario === scenario) {
         $('preview-message').textContent = data.message;
         const label = data.performance?.label || ({ feed: 'Zoeira', normal: 'Obrigação', carry: 'Elogio moderado', support: 'Elogio ao suporte' })[data.category] || '';
         $('preview-kda-summary').textContent = `KDA ${data.values?.kda || '—'} · ${label}`;
       }
     } catch (error) {
-      if (selectedScenario === scenario) {
+      if (reqId === previewRequestId && activeGame === game && selectedScenario === scenario) {
         $('preview-message').textContent = 'Não foi possível carregar a prévia. Escolha um exemplo para tentar novamente.';
         $('preview-kda-summary').textContent = 'Prévia indisponível';
       }
@@ -287,10 +400,20 @@
     dialogMatch = match;
     $('dialog-title').textContent = match.playerName;
     $('dialog-message').textContent = match.message;
-    $('dialog-meta').textContent = `${statusLabels[match.status] || match.status}${match.mode ? ' · ' + match.mode : ''} · ${date(match.endedAt)}${match.error ? ' · ' + match.error : ''}`;
+    const scorePart = match.game === 'cs2' && match.score ? ` · ${match.mapLabel || match.map || ''} (${match.score})` : '';
+    $('dialog-meta').textContent = `${statusLabels[match.status] || match.status}${match.mode ? ' · ' + match.mode : ''}${scorePart} · ${date(match.endedAt)}${match.error ? ' · ' + match.error : ''}`;
+    const leetifyWrap = $('dialog-leetify-wrap');
+    if (leetifyWrap) {
+      const hasLink = match.game === 'cs2' && Boolean(match.leetifyMatchId);
+      leetifyWrap.hidden = !hasLink;
+      if (hasLink) $('dialog-leetify-link').href = `https://leetify.com/app/match-details/${encodeURIComponent(match.leetifyMatchId)}/overview`;
+    }
     $('message-dialog').showModal();
   }
 
+  document.querySelectorAll('[data-game-tab]').forEach(button => {
+    button.addEventListener('click', () => setActiveGame(button.dataset.gameTab));
+  });
   $('poll-interval').addEventListener('input', () => { intervalDirty = true; });
   $('interval-form').addEventListener('submit', event => {
     event.preventDefault();
@@ -317,14 +440,58 @@
   }));
   $('player-form').addEventListener('submit', event => {
     event.preventDefault();
+    if (activeGame === 'cs2') {
+      action($('add-cs2-player'), async () => {
+        await api('/api/players', 'POST', {
+          game: 'cs2',
+          steamId: $('steam-id').value.trim(),
+          gameName: $('cs2-player-name').value.trim(),
+          authCode: $('cs2-auth-code').value.trim(),
+          knownCode: $('cs2-known-code').value.trim(),
+        });
+        $('steam-id').value = '';
+        $('cs2-player-name').value = '';
+        $('cs2-auth-code').value = '';
+        $('cs2-known-code').value = '';
+        toast('Player de CS2 cadastrado. O histórico anterior será usado como referência.');
+        await refresh();
+        $('steam-id').focus();
+      });
+      return;
+    }
     action($('add-player'), async () => {
-      await api('/api/players', 'POST', { gameName: $('game-name').value.trim(), tagLine: $('tag-line').value.trim().replace(/^#/, ''), region: $('region').value });
+      await api('/api/players', 'POST', {
+        game: 'lol',
+        gameName: $('game-name').value.trim(),
+        tagLine: $('tag-line').value.trim().replace(/^#/, ''),
+        region: $('region').value,
+      });
       $('game-name').value = '';
       $('tag-line').value = '';
       toast('Player cadastrado. O histórico anterior será usado como referência.');
       await refresh();
       $('game-name').focus();
     });
+  });
+  $('cs2-auth-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!authDialogPlayer) return;
+    action($('save-cs2-auth'), async () => {
+      await api('/api/players/' + encodeURIComponent(authDialogPlayer.id), 'PATCH', {
+        authCode: $('dialog-auth-code').value.trim(),
+        knownCode: $('dialog-known-code').value.trim(),
+      });
+      $('cs2-auth-dialog').close();
+      toast('Código Steam atualizado com sucesso.');
+      await refresh();
+    });
+  });
+  $('close-cs2-auth').addEventListener('click', () => $('cs2-auth-dialog').close());
+  $('cs2-auth-dialog').addEventListener('click', event => {
+    if (event.target === $('cs2-auth-dialog')) {
+      const rect = event.target.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.target.close();
+    }
   });
   $('connect-whatsapp').addEventListener('click', () => action($('connect-whatsapp'), async () => {
     await api('/api/whatsapp/connect', 'POST');
@@ -370,7 +537,10 @@
     toast('Mensagem copiada.');
   }));
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-  document.addEventListener('message-config-saved', () => loadPreview(selectedScenario));
+  document.addEventListener('message-config-saved', event => {
+    if (!event.detail?.game || event.detail.game === activeGame) loadPreview(selectedScenario);
+  });
+  syncFormMode();
   refresh();
   loadPreview('feed');
   setInterval(() => { if (!document.hidden) refresh(); }, 5000);

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111412">
-  <meta name="description" content="Acompanhe suas partidas de LoL e leve o placar para a resenha do WhatsApp.">
+  <meta name="description" content="Acompanhe partidas de League of Legends e Counter-Strike 2 e leve o placar para a resenha do WhatsApp.">
   <title>GG Report · Central da resenha</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
@@ -13,20 +13,32 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="GG Report início"><span class="brand-mark">gg<span>↗</span></span><span>GG <b>REPORT</b><small>DO NEXUS PRO GRUPO</small></span></a>
+      <a class="brand" href="/" aria-label="GG Report início"><span class="brand-mark">gg<span>↗</span></span><span>GG <b>REPORT</b><small id="brand-subtitle">DO JOGO PRO GRUPO</small></span></a>
       <div class="topbar-end"><span class="local-label"><span class="status-dot"></span>Seu servidor · local</span><a href="#mensagens" class="text-link">Mensagens <span aria-hidden="true">↗</span></a><a href="#setup" class="text-link">Configurações <span aria-hidden="true">↗</span></a></div>
     </header>
 
     <main>
       <div id="connection-alert" class="connection-alert" role="status" hidden>Não foi possível atualizar o painel. Tentando reconectar…</div>
+
+      <nav class="game-tabs" aria-label="Selecionar jogo">
+        <button class="game-tab active" data-game-tab="lol" type="button" aria-pressed="true">
+          <span class="game-tab-badge">MOBA</span>
+          <span class="game-tab-copy"><strong>League of Legends</strong><small>Ranqueadas, Normal e ARAM</small></span>
+        </button>
+        <button class="game-tab" data-game-tab="cs2" type="button" aria-pressed="false">
+          <span class="game-tab-badge">FPS</span>
+          <span class="game-tab-copy"><strong>Counter-Strike 2</strong><small>Premier e Competitivo</small></span>
+        </button>
+      </nav>
+
       <section class="page-intro" aria-labelledby="page-title">
-        <div><p class="eyebrow"><span class="tiny-square"></span> LEAGUE OF LEGENDS</p><h1 id="page-title">Central da resenha<span>.</span></h1><p class="intro-copy">O placar é sério. O comentário, nem tanto.</p></div>
+        <div><p class="eyebrow"><span class="tiny-square"></span> <span id="active-game-eyebrow">LEAGUE OF LEGENDS</span></p><h1 id="page-title">Central da resenha<span>.</span></h1><p id="intro-copy" class="intro-copy">O placar é sério. O comentário, nem tanto.</p></div>
         <button id="check-now" class="button button-outline" type="button"><span aria-hidden="true">↻</span> Verificar agora</button>
       </section>
 
       <section class="stats-grid" aria-label="Resumo do acompanhamento">
-        <div class="stat-card"><div class="stat-label">Players na mira <span aria-hidden="true">◎</span></div><strong id="stat-players">—</strong><small>contas cadastradas</small></div>
-        <div class="stat-card"><div class="stat-label">Partidas detectadas <span aria-hidden="true">▥</span></div><strong id="stat-matches">—</strong><small>no seu histórico</small></div>
+        <div class="stat-card"><div class="stat-label">Players na mira <span aria-hidden="true">◎</span></div><strong id="stat-players">—</strong><small id="stat-players-sub">contas cadastradas</small></div>
+        <div class="stat-card"><div class="stat-label">Partidas detectadas <span aria-hidden="true">▥</span></div><strong id="stat-matches">—</strong><small>no histórico desta aba</small></div>
         <div class="stat-card"><div class="stat-label">Resenhas enviadas <span aria-hidden="true">↗</span></div><strong id="stat-sent">—</strong><small>direto no WhatsApp</small></div>
         <div class="stat-card"><div class="stat-label">Na fila de envio <span aria-hidden="true">◷</span></div><strong id="stat-pending">—</strong><small>aguardando envio</small></div>
       </section>
@@ -36,6 +48,7 @@
         <div class="monitor-controls"><form id="interval-form" class="interval-form"><label for="poll-interval">Verificar a cada</label><div class="interval-input"><input id="poll-interval" name="pollIntervalSeconds" type="number" min="30" max="86400" step="1" value="120" required aria-label="Intervalo em segundos"><span>seg</span></div><button id="save-interval" type="submit" class="icon-button" title="Salvar intervalo" aria-label="Salvar intervalo">✓</button></form><div class="control-divider"></div><label class="switch-label" for="monitor-toggle"><span id="toggle-label">Ativar</span><input id="monitor-toggle" type="checkbox" role="switch"><span class="switch-track" aria-hidden="true"></span></label></div>
       </section>
       <div id="riot-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta a chave da Riot.</strong> Preencha <code>RIOT_API_KEY</code> no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. Você já pode experimentar as prévias abaixo.</p><a href="https://developer.riotgames.com/" target="_blank" rel="noreferrer">Obter chave ↗</a></div>
+      <div id="cs2-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta configurar a chave do CS2.</strong> Preencha <code>STEAM_API_KEY</code> (e opcionalmente <code>LEETIFY_API_KEY</code>) no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. As prévias abaixo já funcionam.</p><a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer">Chave Steam ↗</a></div>
       <p id="monitor-error" class="inline-error monitor-error" role="status" hidden></p>
 
       <div class="workspace-grid">
@@ -43,11 +56,34 @@
           <section class="panel players-panel" aria-labelledby="players-title">
             <div class="panel-header"><div><p class="eyebrow">01 / QUEM VAI PRO PRINT</p><h2 id="players-title">Players monitorados</h2></div><span class="section-icon" aria-hidden="true">◎</span></div>
             <form id="player-form" class="player-form">
-              <div class="riot-id-fields"><div class="field"><label for="game-name">Nome do player</label><input id="game-name" name="gameName" placeholder="Nick do invocador" maxlength="40" autocomplete="off" required></div><span class="riot-hash" aria-hidden="true">#</span><div class="field tag-field"><label for="tag-line">Tag</label><input id="tag-line" name="tagLine" placeholder="BR1" maxlength="10" autocomplete="off" required></div></div>
-              <div class="player-form-bottom"><div class="field region-field"><label for="region">Região da conta</label><select id="region" name="region"><option value="americas">Américas · BR, LAS, LAN, NA</option><option value="europe">Europa</option><option value="asia">Ásia · KR, JP</option><option value="sea">Sudeste Asiático / Oceania</option></select></div><button id="add-player" class="button button-lime" type="submit"><span aria-hidden="true">+</span> Adicionar player</button></div>
+              <div id="lol-player-fields">
+                <div class="riot-id-fields"><div class="field"><label for="game-name">Nome do player</label><input id="game-name" name="gameName" placeholder="Nick do invocador" maxlength="40" autocomplete="off" required></div><span class="riot-hash" aria-hidden="true">#</span><div class="field tag-field"><label for="tag-line">Tag</label><input id="tag-line" name="tagLine" placeholder="BR1" maxlength="10" autocomplete="off" required></div></div>
+                <div class="player-form-bottom"><div class="field region-field"><label for="region">Região da conta</label><select id="region" name="region"><option value="americas">Américas · BR, LAS, LAN, NA</option><option value="europe">Europa</option><option value="asia">Ásia · KR, JP</option><option value="sea">Sudeste Asiático / Oceania</option></select></div><button id="add-player" class="button button-lime" type="submit"><span aria-hidden="true">+</span> Adicionar player</button></div>
+              </div>
+
+              <div id="cs2-player-fields" class="cs2-player-fields" hidden>
+                <div class="cs2-id-fields">
+                  <div class="field"><label for="steam-id">SteamID64</label><input id="steam-id" name="steamId" placeholder="76561198000000000" maxlength="100" autocomplete="off"></div>
+                  <div class="field cs2-alias-field"><label for="cs2-player-name">Apelido (opcional)</label><input id="cs2-player-name" name="cs2PlayerName" placeholder="Automático pela Steam" maxlength="50" autocomplete="off"></div>
+                </div>
+                <details id="cs2-auth-details" class="cs2-auth-details">
+                  <summary><span>Autorização de partidas da Steam (GetNextMatchSharingCode)</span><small>Sem pedir senha</small></summary>
+                  <div class="cs2-auth-body">
+                    <p>Gere o <strong>Código de autenticação</strong> e copie o <strong>Último código de partida</strong> nos <a href="https://help.steampowered.com/pt-br/wizard/HelpWithGameIssue/?appid=730&amp;issueid=128" target="_blank" rel="noreferrer">dados pessoais do CS2 na Steam ↗</a>. Para mapa, placar e ADR das demos <code>.dem</code>, mantenha a conta conectada ao <a href="https://leetify.com/" target="_blank" rel="noreferrer">Leetify ↗</a> (se o perfil já for público lá, os códigos abaixo são opcionais).</p>
+                    <div class="cs2-auth-grid">
+                      <div class="field"><label for="cs2-auth-code">Código de autenticação</label><input id="cs2-auth-code" placeholder="AAAA-AAAAA-AAAA" maxlength="20" autocomplete="off" spellcheck="false"></div>
+                      <div class="field"><label for="cs2-known-code">Último código de partida</label><input id="cs2-known-code" placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx" maxlength="40" autocomplete="off" spellcheck="false"></div>
+                    </div>
+                  </div>
+                </details>
+                <div class="player-form-bottom cs2-form-bottom">
+                  <span class="cs2-mode-pill">Somente Premier e Competitivo · ignora FACEIT</span>
+                  <button id="add-cs2-player" class="button button-lime" type="submit"><span aria-hidden="true">+</span> Adicionar player</button>
+                </div>
+              </div>
             </form>
             <div id="players-list" class="players-list" aria-live="polite"><div class="empty-state compact"><span class="empty-symbol" aria-hidden="true">◎</span><p>Carregando players…</p></div></div>
-            <div class="panel-footnote"><span aria-hidden="true">↳</span> Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.</div>
+            <div id="players-footnote" class="panel-footnote"><span aria-hidden="true">↳</span> <span id="players-footnote-text">Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.</span></div>
           </section>
 
           <section class="panel history-panel" aria-labelledby="history-title">
@@ -67,20 +103,20 @@
             <button id="connect-whatsapp" class="button button-outline button-full" type="button">Conectar com QR Code <span aria-hidden="true">↗</span></button>
             <div id="group-controls" class="group-controls" hidden><form id="group-form"><div class="group-label"><label for="whatsapp-group">Grupo de destino</label><button id="refresh-groups" type="button" class="text-link">Atualizar ↻</button></div><select id="whatsapp-group" required><option value="">Selecione um grupo</option></select><button id="save-group" class="button button-lime button-full" type="submit">Salvar grupo</button></form><p id="saved-group" class="saved-group"></p></div>
             <button id="disconnect-whatsapp" class="text-link disconnect-link" type="button" hidden>Desconectar conta</button>
-            <div class="integration-note">Conexão via WhatsApp Web (Baileys, não oficial). Os envios automáticos começam com o monitor ativo.</div>
+            <div class="integration-note">Conexão compartilhada entre LoL e CS2 via WhatsApp Web (Baileys, não oficial). Os envios automáticos começam com o monitor ativo.</div>
           </section>
 
           <section class="panel preview-panel" aria-labelledby="preview-title">
             <div class="panel-header"><div><p class="eyebrow">TEST DRIVE</p><h2 id="preview-title">Amostra das mensagens</h2></div><span class="badge badge-neutral">Prévia</span></div>
-            <div class="preview-tabs" role="group" aria-label="Escolher exemplo por KDA"><button class="preview-tab active" data-scenario="feed" type="button" aria-pressed="true">Zoeira</button><button class="preview-tab" data-scenario="normal" type="button" aria-pressed="false">Obrigação</button><button class="preview-tab" data-scenario="carry" type="button" aria-pressed="false">Elogio</button><button class="preview-tab" data-scenario="support" type="button" aria-pressed="false">Suporte</button></div>
+            <div class="preview-tabs" role="group" aria-label="Escolher exemplo por KDA"><button class="preview-tab active" data-scenario="feed" type="button" aria-pressed="true">Zoeira</button><button class="preview-tab" data-scenario="normal" type="button" aria-pressed="false">Obrigação</button><button class="preview-tab" data-scenario="carry" type="button" aria-pressed="false">Elogio</button><button id="preview-support-tab" class="preview-tab" data-scenario="support" type="button" aria-pressed="false">Suporte</button></div>
             <p id="preview-kda-summary" class="preview-kda-summary" role="status">Calculando o KDA do exemplo…</p>
-            <div class="message-preview"><div class="message-preview-top"><span class="status-dot"></span> GG Report <span>EXEMPLO</span></div><pre id="preview-message">Carregando exemplo…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div>
+            <div class="message-preview"><div class="message-preview-top"><span class="status-dot"></span> GG Report <span id="preview-game-tag">EXEMPLO</span></div><pre id="preview-message">Carregando exemplo…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div>
             <p class="preview-note"><span aria-hidden="true">◉</span> Só uma simulação. Não envia ao WhatsApp.</p>
           </section>
         </aside>
       </div>
       <section id="mensagens" class="panel message-studio" aria-labelledby="studio-title">
-        <div class="panel-header studio-header"><div><p class="eyebrow">04 / VOCÊ ESCREVE A RESENHA</p><h2 id="studio-title">Sua mensagem, do seu jeito.</h2><p class="studio-intro">Escolha os dados, monte o texto e veja como ele vai chegar ao grupo.</p></div><div class="studio-header-actions"><span id="message-save-state" class="badge badge-neutral" role="status">Carregando</span><button id="expand-message-editor" class="button button-outline studio-expand-button" type="button" aria-pressed="false" title="Ampliar o editor"><span aria-hidden="true">⤢</span><span id="expand-message-label">Ampliar</span></button><button id="save-messages" class="button button-lime" type="button" disabled>Salvar mensagens</button></div></div>
+        <div class="panel-header studio-header"><div><p id="studio-eyebrow" class="eyebrow">04 / VOCÊ ESCREVE A RESENHA · LOL</p><h2 id="studio-title">Sua mensagem, do seu jeito.</h2><p class="studio-intro">Escolha os dados, monte o texto e veja como ele vai chegar ao grupo.</p></div><div class="studio-header-actions"><span id="message-save-state" class="badge badge-neutral" role="status">Carregando</span><button id="expand-message-editor" class="button button-outline studio-expand-button" type="button" aria-pressed="false" title="Ampliar o editor"><span aria-hidden="true">⤢</span><span id="expand-message-label">Ampliar</span></button><button id="save-messages" class="button button-lime" type="button" disabled>Salvar mensagens</button></div></div>
         <div id="message-load-error" class="studio-load-error" role="status" hidden><span>Não foi possível carregar suas mensagens.</span><button id="retry-message-load" class="text-link" type="button">Tentar novamente ↻</button></div>
         <fieldset id="message-editor-fields" class="studio-fields" disabled>
           <legend class="sr-only">Editor de mensagens e prévia</legend>
@@ -91,7 +127,7 @@
           </div>
           <div class="studio-grid">
             <aside class="studio-data-column" aria-labelledby="message-data-title">
-              <div class="studio-block studio-variables-block"><div class="studio-block-title"><h3 id="message-data-title"><span class="studio-step">1</span> Escolha os campos</h3><span id="message-variable-count" class="count-label" aria-live="polite"></span></div><label class="sr-only" for="message-variable-search">Buscar campo da partida</label><div class="studio-search"><span aria-hidden="true">⌕</span><input id="message-variable-search" type="search" placeholder="Buscar campo…" autocomplete="off"></div><div id="message-variable-groups" class="studio-variable-groups" role="group" aria-label="Filtrar campos por categoria"></div><div class="studio-data-hint"><span id="message-variable-target">Inserir no texto</span><small>Clique ou arraste para inserir</small></div><div id="message-variable-list" class="studio-variable-list" aria-label="Variáveis disponíveis"></div><p id="message-variable-empty" class="studio-variable-empty" hidden>Nenhum campo encontrado.<br>Tente “modo”, “lane” ou “player”.</p></div>
+              <div class="studio-block studio-variables-block"><div class="studio-block-title"><h3 id="message-data-title"><span class="studio-step">1</span> Escolha os campos</h3><span id="message-variable-count" class="count-label" aria-live="polite"></span></div><label class="sr-only" for="message-variable-search">Buscar campo da partida</label><div class="studio-search"><span aria-hidden="true">⌕</span><input id="message-variable-search" type="search" placeholder="Buscar campo…" autocomplete="off"></div><div id="message-variable-groups" class="studio-variable-groups" role="group" aria-label="Filtrar campos por categoria"></div><div class="studio-data-hint"><span id="message-variable-target">Inserir no texto</span><small>Clique ou arraste para inserir</small></div><div id="message-variable-list" class="studio-variable-list" aria-label="Variáveis disponíveis"></div><p id="message-variable-empty" class="studio-variable-empty" hidden>Nenhum campo encontrado.<br>Tente “modo”, “kda” ou “player”.</p></div>
             </aside>
             <div class="studio-editor-column">
               <div class="studio-block studio-text-block">
@@ -101,7 +137,7 @@
                 <p id="message-template-help" class="studio-help">Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Modo: {{modo}}</code>. Use <code>{{zoeira}}</code> para incluir um comentário.</p>
                 <div id="message-used-variables" class="studio-used-variables" aria-label="Campos usados no texto"></div>
               </div>
-              <div class="studio-kda-policy" aria-labelledby="message-kda-title"><div class="studio-kda-policy-title"><h3 id="message-kda-title">A frase segue o KDA</h3><code>{{kda}}</code></div><p>(Abates + assistências) ÷ mortes. Sem mortes, divide por 1.</p><div class="studio-kda-bands" aria-label="Faixas de KDA"><span class="studio-kda-band" data-kda-band="feed"><strong>Abaixo de 1</strong><small>Zoeira</small></span><span class="studio-kda-band" data-kda-band="normal"><strong>1 até abaixo de 2,5</strong><small>Obrigação</small></span><span class="studio-kda-band" data-kda-band="carry"><strong>A partir de 2,5</strong><small>Elogio moderado</small></span></div><p class="studio-kda-policy-note">As assistências também contam para o suporte. As faixas usam o cálculo sem arredondar.</p></div>
+              <div class="studio-kda-policy" aria-labelledby="message-kda-title"><div class="studio-kda-policy-title"><h3 id="message-kda-title">A frase segue o KDA</h3><code>{{kda}}</code></div><p>(Abates + assistências) ÷ mortes. Sem mortes, divide por 1.</p><div class="studio-kda-bands" aria-label="Faixas de KDA"><span class="studio-kda-band" data-kda-band="feed"><strong>Abaixo de 1</strong><small>Zoeira</small></span><span class="studio-kda-band" data-kda-band="normal"><strong>1 até abaixo de 2,5</strong><small>Obrigação</small></span><span class="studio-kda-band" data-kda-band="carry"><strong>A partir de 2,5</strong><small>Elogio moderado</small></span></div><p id="studio-kda-note" class="studio-kda-policy-note">As assistências também contam para o suporte. As faixas usam o cálculo sem arredondar.</p></div>
               <details id="message-phrases-details" class="studio-phrases-details"><summary><span><span aria-hidden="true">✦</span> Personalizar as zoeiras<small>Frases que entram em {{zoeira}}</small></span><span id="message-phrase-count" class="count-label"></span></summary><div class="studio-block studio-phrases-block">
                 <label class="sr-only" for="message-phrases-text">Frases da categoria selecionada, uma por linha</label>
                 <div id="message-category-tabs" class="studio-category-tabs" role="group" aria-label="Tipo de desempenho"></div>
@@ -123,14 +159,32 @@
               </div>
             </div>
           </div>
-          <div class="studio-bottom"><p>Salvar vale para as próximas partidas detectadas. Mensagens que já estão na fila mantêm o texto original.</p><button id="restore-message-defaults" type="button" class="text-link">Carregar modelos originais ↺</button></div>
+          <div class="studio-bottom"><p>Salvar vale para as próximas partidas detectadas neste jogo. Mensagens que já estão na fila mantêm o texto original.</p><button id="restore-message-defaults" type="button" class="text-link">Carregar modelos originais ↺</button></div>
         </fieldset>
       </section>
     </main>
 
-    <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span></div><p>GG Report is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p></footer>
+    <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span><a id="footer-leetify" class="text-link footer-credit" href="https://leetify.com/" target="_blank" rel="noreferrer">Data Provided by Leetify ↗</a></div><p>GG Report is not endorsed by Riot Games, Valve Corporation, or Leetify. Riot Games, League of Legends, Counter-Strike, Steam, and associated properties are trademarks or registered trademarks of their respective owners.</p></footer>
   </div>
-  <dialog id="message-dialog"><div class="dialog-header"><div><p class="eyebrow">MENSAGEM DA PARTIDA</p><h2 id="dialog-title">Resumo</h2></div><button id="close-dialog" class="icon-button" type="button" aria-label="Fechar mensagem">×</button></div><pre id="dialog-message"></pre><p id="dialog-meta"></p><button id="copy-message" class="button button-outline button-full" type="button">Copiar mensagem</button></dialog>
+
+  <dialog id="message-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">MENSAGEM DA PARTIDA</p><h2 id="dialog-title">Resumo</h2></div><button id="close-dialog" class="icon-button" type="button" aria-label="Fechar mensagem">×</button></div>
+    <pre id="dialog-message"></pre>
+    <p id="dialog-meta"></p>
+    <p id="dialog-leetify-wrap" class="dialog-external-link" hidden><a id="dialog-leetify-link" class="text-link" href="https://leetify.com/" target="_blank" rel="noreferrer"><strong>View on Leetify ↗</strong></a></p>
+    <button id="copy-message" class="button button-outline button-full" type="button">Copiar mensagem</button>
+  </dialog>
+
+  <dialog id="cs2-auth-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">COUNTER-STRIKE 2 · STEAM</p><h2 id="cs2-auth-dialog-title">Autorização de partidas</h2></div><button id="close-cs2-auth" class="icon-button" type="button" aria-label="Fechar janela">×</button></div>
+    <form id="cs2-auth-form" class="cs2-dialog-form">
+      <p class="cs2-dialog-help">Atualize os códigos gerados nos <a href="https://help.steampowered.com/pt-br/wizard/HelpWithGameIssue/?appid=730&amp;issueid=128" target="_blank" rel="noreferrer">dados pessoais do CS2 na Steam ↗</a> sem informar senha.</p>
+      <div class="field"><label for="dialog-auth-code">Código de autenticação</label><input id="dialog-auth-code" placeholder="AAAA-AAAAA-AAAA" maxlength="20" autocomplete="off" spellcheck="false" required></div>
+      <div class="field"><label for="dialog-known-code">Último código de partida</label><input id="dialog-known-code" placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx" maxlength="40" autocomplete="off" spellcheck="false" required></div>
+      <button id="save-cs2-auth" class="button button-lime button-full" type="submit">Salvar códigos</button>
+    </form>
+  </dialog>
+
   <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>
