@@ -3,6 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getDefaultMessageConfig, getLegacyPhrasePools, validateMessageConfig } from './message.js';
+import { GAME_IDS, messagesFor } from './games.js';
+
+// Linhas antigas não têm `game` no JSON; a coluna adicionada pela migração é a fonte da verdade.
+const parse = row => ({ ...JSON.parse(row.payload), game: row.game });
 
 export class Store {
   constructor(filename, { pollIntervalSeconds = 120 } = {}) {
@@ -23,6 +27,21 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS delivery_queue ON matches(status, next_attempt_at);
     `);
+    // Migração aditiva multi-jogo: tudo o que já existe continua sendo League of Legends.
+    for (const table of ['players', 'matches']) {
+      if (!this.db.prepare(`PRAGMA table_info(${table})`).all().some(column => column.name === 'game')) {
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN game TEXT NOT NULL DEFAULT 'lol'`);
+      }
+    }
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS game_message_config (game TEXT PRIMARY KEY, payload TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS matches_by_game ON matches(game, ended_at);
+    `);
+    // O LoL segue na tabela message_config original; os demais jogos têm modelos próprios.
+    for (const game of GAME_IDS.filter(id => id !== 'lol')) {
+      this.db.prepare('INSERT OR IGNORE INTO game_message_config (game,payload) VALUES (?,?)')
+        .run(game, JSON.stringify(messagesFor(game).defaultConfig()));
+    }
     this.db.prepare('INSERT OR IGNORE INTO settings (id,payload) VALUES (1,?)').run(JSON.stringify({
       pollIntervalSeconds, monitoringEnabled: false, whatsappGroupId: '', whatsappGroupName: '',
     }));
@@ -68,12 +87,14 @@ export class Store {
     }
   }
 
-  messageConfig() {
+  messageConfig(game = 'lol') {
+    if (game !== 'lol') return JSON.parse(this.db.prepare('SELECT payload FROM game_message_config WHERE game=?').get(game).payload);
     return JSON.parse(this.db.prepare('SELECT payload FROM message_config WHERE id=1').get().payload);
   }
-  updateMessageConfig(config) {
-    const normalized = validateMessageConfig(config);
-    this.db.prepare('UPDATE message_config SET payload=? WHERE id=1').run(JSON.stringify(normalized));
+  updateMessageConfig(config, game = 'lol') {
+    const normalized = messagesFor(game).validateConfig(config);
+    if (game !== 'lol') this.db.prepare('UPDATE game_message_config SET payload=? WHERE game=?').run(JSON.stringify(normalized), game);
+    else this.db.prepare('UPDATE message_config SET payload=? WHERE id=1').run(JSON.stringify(normalized));
     return normalized;
   }
   settings() { return JSON.parse(this.db.prepare('SELECT payload FROM settings WHERE id=1').get().payload); }
@@ -82,33 +103,39 @@ export class Store {
     this.db.prepare('UPDATE settings SET payload=? WHERE id=1').run(JSON.stringify(settings));
     return settings;
   }
-  players() { return this.db.prepare('SELECT payload FROM players ORDER BY rowid DESC').all().map(row => JSON.parse(row.payload)); }
-  player(id) {
-    const row = this.db.prepare('SELECT payload FROM players WHERE id=?').get(id);
-    return row ? JSON.parse(row.payload) : null;
+  players(game = null) {
+    const rows = game
+      ? this.db.prepare('SELECT game,payload FROM players WHERE game=? ORDER BY rowid DESC').all(game)
+      : this.db.prepare('SELECT game,payload FROM players ORDER BY rowid DESC').all();
+    return rows.map(parse);
   }
-  addPlayer(account, region, lastSeenMatchId = null) {
+  player(id) {
+    const row = this.db.prepare('SELECT game,payload FROM players WHERE id=?').get(id);
+    return row ? parse(row) : null;
+  }
+  addPlayer(account, region, lastSeenMatchId = null, game = account?.game || 'lol') {
     const player = {
-      id: randomUUID(), ...account, region, enabled: true,
+      id: randomUUID(), ...account, game, region, enabled: true,
       createdAt: new Date().toISOString(), lastSeenMatchId,
       lastCheckedAt: null, lastError: null,
     };
-    this.db.prepare('INSERT INTO players (id,identity,payload) VALUES (?,?,?)')
-      .run(player.id, `${region}:${account.puuid}`, JSON.stringify(player));
+    const identity = game === 'lol' ? `${region}:${account.puuid}` : `${game}:${account.steamId}`;
+    this.db.prepare('INSERT INTO players (id,game,identity,payload) VALUES (?,?,?,?)')
+      .run(player.id, game, identity, JSON.stringify(player));
     return player;
   }
   updatePlayer(id, patch) {
     const previous = this.player(id);
     if (!previous) return null;
-    const player = { ...previous, ...patch };
+    const player = { ...previous, ...patch, game: previous.game };
     this.db.prepare('UPDATE players SET payload=? WHERE id=?').run(JSON.stringify(player), id);
     return player;
   }
   removePlayer(id) {
     this.db.prepare('DELETE FROM players WHERE id=?').run(id);
     // Preserve the history but cancel deliveries belonging to a removed player.
-    for (const match of this.db.prepare("SELECT payload FROM matches WHERE player_id=? AND status!='sent'").all(id)) {
-      const entry = JSON.parse(match.payload);
+    for (const match of this.db.prepare("SELECT game,payload FROM matches WHERE player_id=? AND status!='sent'").all(id)) {
+      const entry = parse(match);
       this.updateDelivery(entry.id, { status: 'failed', attempts: 5, error: 'Jogador removido. Envio cancelado.' });
     }
   }
@@ -116,42 +143,51 @@ export class Store {
     return Boolean(this.db.prepare('SELECT 1 FROM matches WHERE player_id=? AND riot_match_id=?').get(playerId, riotMatchId));
   }
   addMatch(player, match, message, groupId) {
+    const game = player.game || match.game || 'lol';
     const entry = {
-      ...match, id: randomUUID(), riotMatchId: match.id, playerId: player.id,
+      ...match, game, id: randomUUID(), riotMatchId: match.id, playerId: player.id,
       message, groupId, status: 'pending', attempts: 0, nextAttemptAt: 0,
       error: null, sentAt: null, createdAt: new Date().toISOString(),
     };
     this.db.prepare(`INSERT OR IGNORE INTO matches
-      (id,player_id,riot_match_id,ended_at,status,payload) VALUES (?,?,?,?,'pending',?)`)
-      .run(entry.id, player.id, match.id, match.endedAt, JSON.stringify(entry));
+      (id,game,player_id,riot_match_id,ended_at,status,payload) VALUES (?,?,?,?,?,'pending',?)`)
+      .run(entry.id, game, player.id, match.id, match.endedAt, JSON.stringify(entry));
     return entry;
   }
-  matches(limit = 100) {
-    return this.db.prepare('SELECT payload FROM matches ORDER BY ended_at DESC, rowid DESC LIMIT ?')
-      .all(limit).map(row => JSON.parse(row.payload));
+  matches(limit = 100, game = null) {
+    const rows = game
+      ? this.db.prepare('SELECT game,payload FROM matches WHERE game=? ORDER BY ended_at DESC, rowid DESC LIMIT ?').all(game, limit)
+      : this.db.prepare('SELECT game,payload FROM matches ORDER BY ended_at DESC, rowid DESC LIMIT ?').all(limit);
+    return rows.map(parse);
   }
   match(id) {
-    const row = this.db.prepare('SELECT payload FROM matches WHERE id=?').get(id);
-    return row ? JSON.parse(row.payload) : null;
+    const row = this.db.prepare('SELECT game,payload FROM matches WHERE id=?').get(id);
+    return row ? parse(row) : null;
   }
   dueDeliveries(now = Date.now()) {
-    return this.db.prepare(`SELECT payload FROM matches WHERE status IN ('pending','failed')
+    return this.db.prepare(`SELECT game,payload FROM matches WHERE status IN ('pending','failed')
       AND attempts<5 AND next_attempt_at<=? ORDER BY ended_at ASC LIMIT 20`)
-      .all(now).map(row => JSON.parse(row.payload));
+      .all(now).map(parse);
   }
   updateDelivery(id, patch) {
     const previous = this.match(id);
     if (!previous) return null;
-    const entry = { ...previous, ...patch };
+    const entry = { ...previous, ...patch, game: previous.game };
     this.db.prepare('UPDATE matches SET status=?,attempts=?,next_attempt_at=?,payload=? WHERE id=?')
       .run(entry.status, entry.attempts, entry.nextAttemptAt, JSON.stringify(entry), id);
     return entry;
   }
-  stats() {
-    const rows = this.db.prepare('SELECT status,COUNT(*) AS count FROM matches GROUP BY status').all();
+  stats(game = null) {
+    const rows = game
+      ? this.db.prepare('SELECT status,COUNT(*) AS count FROM matches WHERE game=? GROUP BY status').all(game)
+      : this.db.prepare('SELECT status,COUNT(*) AS count FROM matches GROUP BY status').all();
     const counts = Object.fromEntries(rows.map(row => [row.status, Number(row.count)]));
-    return { players: this.players().length, matches: Object.values(counts).reduce((a, b) => a + b, 0),
-      sent: counts.sent || 0, pending: (counts.pending || 0) + (counts.failed || 0) };
+    return {
+      players: this.players(game).length,
+      matches: Object.values(counts).reduce((a, b) => a + b, 0),
+      sent: counts.sent || 0,
+      pending: (counts.pending || 0) + (counts.failed || 0),
+    };
   }
   close() { this.db.close(); }
 }

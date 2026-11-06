@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto';
 import { formatMessage } from './message.js';
+import { messagesFor } from './games.js';
+
+const RIOT_MISSING = 'Configure RIOT_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
+const CS2_MISSING = 'Configure STEAM_API_KEY (e opcionalmente LEETIFY_API_KEY) no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 
 export class Monitor {
-  constructor({ store, riot, whatsapp, logger = console }) {
-    Object.assign(this, { store, riot, whatsapp, logger });
+  constructor({ store, riot, cs2 = null, whatsapp, logger = console }) {
+    Object.assign(this, { store, riot, cs2, whatsapp, logger });
     this.running = false;
     this.lastCheckAt = null;
     this.lastError = null;
@@ -38,16 +42,28 @@ export class Monitor {
     this.running = true;
     this.lastError = null;
     try {
-      if (!this.riot.configured) throw new Error('Configure RIOT_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.');
-      for (const player of this.store.players().filter(player => player.enabled)) {
+      const enabledPlayers = this.store.players().filter(player => player.enabled);
+      if (!enabledPlayers.length && !this.riot?.configured && !this.cs2?.configured) {
+        throw new Error(RIOT_MISSING);
+      }
+      const rateLimited = new Set();
+      for (const player of enabledPlayers) {
         if (this.stopped || !this.store.settings().monitoringEnabled) break;
+        const game = player.game || 'lol';
+        if (rateLimited.has(game)) continue;
         try {
-          await this.checkPlayer(player);
+          if (game === 'cs2') {
+            if (!this.cs2?.configured) throw new Error(CS2_MISSING);
+            await this.checkCs2Player(player);
+          } else {
+            if (!this.riot?.configured) throw new Error(RIOT_MISSING);
+            await this.checkPlayer(player);
+          }
           if (this.store.player(player.id)) this.store.updatePlayer(player.id, { lastCheckedAt: new Date().toISOString(), lastError: null });
         } catch (error) {
           if (this.store.player(player.id)) this.store.updatePlayer(player.id, { lastCheckedAt: new Date().toISOString(), lastError: error.message });
           this.lastError = error.message;
-          if (error.retryAfterMs > 0) break;
+          if (error.retryAfterMs > 0) rateLimited.add(game);
         }
       }
       await this.deliver();
@@ -82,11 +98,72 @@ export class Monitor {
       const match = await this.riot.match(player, id);
       if (!this.store.player(player.id)?.enabled || this.stopped || !this.store.settings().monitoringEnabled) return;
       if (!match || Date.parse(match.endedAt) <= Date.parse(player.createdAt)) continue;
-      const { message } = formatMessage(match, { config: this.store.messageConfig() });
+      const { message } = formatMessage(match, { config: this.store.messageConfig('lol') });
       this.store.addMatch(player, match, message, this.store.settings().whatsappGroupId);
     }
     if (newestId && this.store.player(player.id)?.enabled && !this.stopped && this.store.settings().monitoringEnabled)
       this.store.updatePlayer(player.id, { lastSeenMatchId: newestId });
+  }
+  async checkCs2Player(player) {
+    const engine = messagesFor('cs2');
+    if (player.authCode) {
+      let cursor = player.lastSeenMatchId || player.knownCode;
+      const codes = await this.cs2.walkSharingCodes(player.steamId, player.authCode, cursor, { maxSteps: 50 });
+      for (const code of codes) {
+        if (!this.store.player(player.id)?.enabled || this.stopped || !this.store.settings().monitoringEnabled) return;
+        if (this.store.hasMatch(player.id, code)) {
+          cursor = code;
+          this.store.updatePlayer(player.id, { lastSeenMatchId: code, knownCode: code, pendingShareCode: null, pendingSince: null });
+          continue;
+        }
+        const outcome = await this.cs2.matchByShareCode(player, code);
+        if (!this.store.player(player.id)?.enabled || this.stopped || !this.store.settings().monitoringEnabled) return;
+        if (outcome.state === 'pending') {
+          const now = Date.now();
+          const current = this.store.player(player.id);
+          const firstSeen = current?.pendingShareCode === code && Number.isFinite(current.pendingSince) ? current.pendingSince : now;
+          const graceMs = this.cs2.pendingGraceMs ?? 45 * 60_000;
+          if (now - firstSeen < graceMs) {
+            this.store.updatePlayer(player.id, { lastSeenMatchId: cursor, knownCode: cursor, pendingShareCode: code, pendingSince: firstSeen });
+            throw new Error('Nova partida detectada na Steam; aguardando análise da demo (.dem) para enviar o resumo.');
+          }
+          // Se a demo expirou/falhou nos servidores da Valve, avança para não travar partidas seguintes.
+          cursor = code;
+          this.store.updatePlayer(player.id, { lastSeenMatchId: code, knownCode: code, pendingShareCode: null, pendingSince: null });
+          continue;
+        }
+        if (outcome.state === 'ignored') {
+          cursor = code;
+          this.store.updatePlayer(player.id, { lastSeenMatchId: code, knownCode: code, pendingShareCode: null, pendingSince: null });
+          continue;
+        }
+        const { match } = outcome;
+        if (Date.parse(match.endedAt) > Date.parse(player.createdAt)) {
+          const { message } = engine.formatMessage(match, { config: this.store.messageConfig('cs2') });
+          this.store.addMatch(player, match, message, this.store.settings().whatsappGroupId);
+        }
+        cursor = code;
+        this.store.updatePlayer(player.id, { lastSeenMatchId: code, knownCode: code, pendingShareCode: null, pendingSince: null });
+      }
+      return;
+    }
+    const matches = await this.cs2.recentMatches(player);
+    const newestId = matches[0]?.id || null;
+    const unseen = [];
+    for (const match of matches) {
+      if (match.id === player.lastSeenMatchId) break;
+      unseen.push(match);
+    }
+    for (const match of unseen.reverse()) {
+      if (!this.store.player(player.id)?.enabled || this.stopped || !this.store.settings().monitoringEnabled) return;
+      if (this.store.hasMatch(player.id, match.id)) continue;
+      if (Date.parse(match.endedAt) <= Date.parse(player.createdAt)) continue;
+      const { message } = engine.formatMessage(match, { config: this.store.messageConfig('cs2') });
+      this.store.addMatch(player, match, message, this.store.settings().whatsappGroupId);
+    }
+    if (newestId && this.store.player(player.id)?.enabled && !this.stopped && this.store.settings().monitoringEnabled) {
+      this.store.updatePlayer(player.id, { lastSeenMatchId: newestId });
+    }
   }
   async deliver() {
     if (this.whatsapp.status().state !== 'connected') return;
