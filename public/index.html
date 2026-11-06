@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111412">
+  <meta name="description" content="Acompanhe suas partidas de LoL e leve o placar para a resenha do WhatsApp.">
+  <title>GG Report · Central da resenha</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+  <script src="/messages.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="GG Report início"><span class="brand-mark">gg<span>↗</span></span><span>GG <b>REPORT</b><small>DO NEXUS PRO GRUPO</small></span></a>
+      <div class="topbar-end"><span class="local-label"><span class="status-dot"></span>Seu servidor · local</span><a href="#mensagens" class="text-link">Mensagens <span aria-hidden="true">↗</span></a><a href="#setup" class="text-link">Configurações <span aria-hidden="true">↗</span></a></div>
+    </header>
+
+    <main>
+      <div id="connection-alert" class="connection-alert" role="status" hidden>Não foi possível atualizar o painel. Tentando reconectar…</div>
+      <section class="page-intro" aria-labelledby="page-title">
+        <div><p class="eyebrow"><span class="tiny-square"></span> LEAGUE OF LEGENDS</p><h1 id="page-title">Central da resenha<span>.</span></h1><p class="intro-copy">O placar é sério. O comentário, nem tanto.</p></div>
+        <button id="check-now" class="button button-outline" type="button"><span aria-hidden="true">↻</span> Verificar agora</button>
+      </section>
+
+      <section class="stats-grid" aria-label="Resumo do acompanhamento">
+        <div class="stat-card"><div class="stat-label">Players na mira <span aria-hidden="true">◎</span></div><strong id="stat-players">—</strong><small>contas cadastradas</small></div>
+        <div class="stat-card"><div class="stat-label">Partidas detectadas <span aria-hidden="true">▥</span></div><strong id="stat-matches">—</strong><small>no seu histórico</small></div>
+        <div class="stat-card"><div class="stat-label">Resenhas enviadas <span aria-hidden="true">↗</span></div><strong id="stat-sent">—</strong><small>direto no WhatsApp</small></div>
+        <div class="stat-card"><div class="stat-label">Na fila de envio <span aria-hidden="true">◷</span></div><strong id="stat-pending">—</strong><small>aguardando envio</small></div>
+      </section>
+
+      <section id="setup" class="monitor-bar" aria-labelledby="monitor-title">
+        <div class="monitor-description"><span id="monitor-icon" class="monitor-symbol" aria-hidden="true">◉</span><div><h2 id="monitor-title">Monitor de partidas <span id="monitor-badge" class="badge badge-neutral">Carregando</span></h2><p id="monitor-detail">Buscando o status do monitor…</p></div></div>
+        <div class="monitor-controls"><form id="interval-form" class="interval-form"><label for="poll-interval">Verificar a cada</label><div class="interval-input"><input id="poll-interval" name="pollIntervalSeconds" type="number" min="30" max="86400" step="1" value="120" required aria-label="Intervalo em segundos"><span>seg</span></div><button id="save-interval" type="submit" class="icon-button" title="Salvar intervalo" aria-label="Salvar intervalo">✓</button></form><div class="control-divider"></div><label class="switch-label" for="monitor-toggle"><span id="toggle-label">Ativar</span><input id="monitor-toggle" type="checkbox" role="switch"><span class="switch-track" aria-hidden="true"></span></label></div>
+      </section>
+      <div id="riot-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta a chave da Riot.</strong> Preencha <code>RIOT_API_KEY</code> no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. Você já pode experimentar as prévias abaixo.</p><a href="https://developer.riotgames.com/" target="_blank" rel="noreferrer">Obter chave ↗</a></div>
+      <p id="monitor-error" class="inline-error monitor-error" role="status" hidden></p>
+
+      <div class="workspace-grid">
+        <div class="main-column">
+          <section class="panel players-panel" aria-labelledby="players-title">
+            <div class="panel-header"><div><p class="eyebrow">01 / QUEM VAI PRO PRINT</p><h2 id="players-title">Players monitorados</h2></div><span class="section-icon" aria-hidden="true">◎</span></div>
+            <form id="player-form" class="player-form">
+              <div class="riot-id-fields"><div class="field"><label for="game-name">Nome do player</label><input id="game-name" name="gameName" placeholder="Nick do invocador" maxlength="40" autocomplete="off" required></div><span class="riot-hash" aria-hidden="true">#</span><div class="field tag-field"><label for="tag-line">Tag</label><input id="tag-line" name="tagLine" placeholder="BR1" maxlength="10" autocomplete="off" required></div></div>
+              <div class="player-form-bottom"><div class="field region-field"><label for="region">Região da conta</label><select id="region" name="region"><option value="americas">Américas · BR, LAS, LAN, NA</option><option value="europe">Europa</option><option value="asia">Ásia · KR, JP</option><option value="sea">Sudeste Asiático / Oceania</option></select></div><button id="add-player" class="button button-lime" type="submit"><span aria-hidden="true">+</span> Adicionar player</button></div>
+            </form>
+            <div id="players-list" class="players-list" aria-live="polite"><div class="empty-state compact"><span class="empty-symbol" aria-hidden="true">◎</span><p>Carregando players…</p></div></div>
+            <div class="panel-footnote"><span aria-hidden="true">↳</span> Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.</div>
+          </section>
+
+          <section class="panel history-panel" aria-labelledby="history-title">
+            <div class="panel-header"><div><p class="eyebrow">02 / O PLACAR NÃO MENTE</p><h2 id="history-title">Últimas partidas</h2></div><span id="history-count" class="count-label">0 partidas</span></div>
+            <div class="history-toolbar" role="group" aria-label="Filtrar partidas"><button class="filter-tab active" data-filter="all" type="button" aria-pressed="true">Todas</button><button class="filter-tab" data-filter="sent" type="button" aria-pressed="false">Enviadas</button><button class="filter-tab" data-filter="pending" type="button" aria-pressed="false">Na fila</button><button class="filter-tab" data-filter="failed" type="button" aria-pressed="false">Com erro</button></div>
+            <div id="matches-list" class="matches-list" aria-live="polite"><div class="empty-state"><span class="empty-symbol" aria-hidden="true">▤</span><h3>A próxima partida já tem plateia.</h3><p>Cadastre um player e ative o monitor.<br>As novas partidas aparecem aqui.</p></div></div>
+          </section>
+        </div>
+
+        <aside class="side-column">
+          <section class="panel whatsapp-panel" aria-labelledby="whatsapp-title">
+            <div class="panel-header"><div><p class="eyebrow">03 / DESTINO DA RESENHA</p><h2 id="whatsapp-title">WhatsApp</h2></div><span id="whatsapp-badge" class="badge badge-neutral">Desconectado</span></div>
+            <div id="whatsapp-offline" class="whatsapp-offline"><div class="whatsapp-illustration" aria-hidden="true"><span>↗</span><i></i><i></i><i></i></div><h3>O grupo merece saber.</h3><p>Conecte sua conta e escolha onde os placares vão chegar.</p></div>
+            <div id="qr-container" class="qr-container" hidden><img id="whatsapp-qr" alt="QR Code para conectar o WhatsApp" width="220" height="220"><p>No celular: <strong>WhatsApp → Aparelhos conectados → Conectar aparelho.</strong></p><small>O QR Code atualiza automaticamente.</small></div>
+            <div id="whatsapp-connected" class="whatsapp-connected" hidden><span class="connected-icon" aria-hidden="true">✓</span><div><strong>Conta conectada</strong><small id="whatsapp-phone"></small></div></div>
+            <p id="whatsapp-error" class="inline-error" role="status" hidden></p>
+            <button id="connect-whatsapp" class="button button-outline button-full" type="button">Conectar com QR Code <span aria-hidden="true">↗</span></button>
+            <div id="group-controls" class="group-controls" hidden><form id="group-form"><div class="group-label"><label for="whatsapp-group">Grupo de destino</label><button id="refresh-groups" type="button" class="text-link">Atualizar ↻</button></div><select id="whatsapp-group" required><option value="">Selecione um grupo</option></select><button id="save-group" class="button button-lime button-full" type="submit">Salvar grupo</button></form><p id="saved-group" class="saved-group"></p></div>
+            <button id="disconnect-whatsapp" class="text-link disconnect-link" type="button" hidden>Desconectar conta</button>
+            <div class="integration-note">Conexão via WhatsApp Web (Baileys, não oficial). Os envios automáticos começam com o monitor ativo.</div>
+          </section>
+
+          <section class="panel preview-panel" aria-labelledby="preview-title">
+            <div class="panel-header"><div><p class="eyebrow">TEST DRIVE</p><h2 id="preview-title">Amostra da zoeira</h2></div><span class="badge badge-neutral">Prévia</span></div>
+            <div class="preview-tabs" role="group" aria-label="Escolher exemplo"><button class="preview-tab active" data-scenario="feed" type="button" aria-pressed="true">Feedou</button><button class="preview-tab" data-scenario="carry" type="button" aria-pressed="false">Carregou</button><button class="preview-tab" data-scenario="support" type="button" aria-pressed="false">Suporte</button></div>
+            <div class="message-preview"><div class="message-preview-top"><span class="status-dot"></span> GG Report <span>EXEMPLO</span></div><pre id="preview-message">Carregando exemplo…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div>
+            <p class="preview-note"><span aria-hidden="true">◉</span> Só uma simulação. Não envia ao WhatsApp.</p>
+          </section>
+        </aside>
+      </div>
+      <section id="mensagens" class="panel message-studio" aria-labelledby="studio-title">
+        <div class="panel-header studio-header"><div><p class="eyebrow">04 / VOCÊ ESCREVE A RESENHA</p><h2 id="studio-title">Sua mensagem, do seu jeito.</h2><p class="studio-intro">Escolha os dados, monte o texto e veja como ele vai chegar ao grupo.</p></div><div class="studio-header-actions"><span id="message-save-state" class="badge badge-neutral" role="status">Carregando</span><button id="expand-message-editor" class="button button-outline studio-expand-button" type="button" aria-pressed="false" title="Ampliar o editor"><span aria-hidden="true">⤢</span><span id="expand-message-label">Ampliar</span></button><button id="save-messages" class="button button-lime" type="button" disabled>Salvar mensagens</button></div></div>
+        <div id="message-load-error" class="studio-load-error" role="status" hidden><span>Não foi possível carregar suas mensagens.</span><button id="retry-message-load" class="text-link" type="button">Tentar novamente ↻</button></div>
+        <fieldset id="message-editor-fields" class="studio-fields" disabled>
+          <legend class="sr-only">Editor de mensagens e prévia</legend>
+          <div class="studio-template-toolbar">
+            <div class="studio-model-picker"><label for="message-template-select">Variação da mensagem <span id="message-template-count" class="count-label"></span></label><div class="studio-variation-row"><select id="message-template-select" aria-label="Variação de mensagem"></select><button id="add-message-template" class="icon-button" type="button" aria-label="Criar variação" title="Criar variação">+</button></div></div>
+            <div class="field studio-model-name"><label for="message-template-name">Nome da variação</label><input id="message-template-name" type="text" maxlength="60" autocomplete="off"></div>
+            <div class="studio-model-actions"><label class="studio-enabled"><input id="message-template-enabled" type="checkbox"> Usar nos envios</label><div><button id="duplicate-message-template" class="text-link" type="button">Duplicar</button><button id="remove-message-template" class="text-link studio-remove" type="button">Remover</button></div></div>
+          </div>
+          <div class="studio-grid">
+            <aside class="studio-data-column" aria-labelledby="message-data-title">
+              <div class="studio-block studio-variables-block"><div class="studio-block-title"><h3 id="message-data-title"><span class="studio-step">1</span> Escolha os campos</h3><span id="message-variable-count" class="count-label" aria-live="polite"></span></div><label class="sr-only" for="message-variable-search">Buscar campo da partida</label><div class="studio-search"><span aria-hidden="true">⌕</span><input id="message-variable-search" type="search" placeholder="Buscar campo…" autocomplete="off"></div><div id="message-variable-groups" class="studio-variable-groups" role="group" aria-label="Filtrar campos por categoria"></div><div class="studio-data-hint"><span id="message-variable-target">Inserir no texto</span><small>Clique ou arraste para inserir</small></div><div id="message-variable-list" class="studio-variable-list" aria-label="Variáveis disponíveis"></div><p id="message-variable-empty" class="studio-variable-empty" hidden>Nenhum campo encontrado.<br>Tente “modo”, “lane” ou “player”.</p></div>
+            </aside>
+            <div class="studio-editor-column">
+              <div class="studio-block studio-text-block">
+                <div class="studio-block-title"><h3><label for="message-template-text"><span class="studio-step">2</span> Monte sua mensagem</label></h3><span id="message-text-count" class="count-label">0 / 3.000</span></div>
+                <div class="studio-editor-caption"><span class="studio-status-line"><span class="status-dot"></span> Texto com variáveis</span><span>Preenchido a cada partida</span></div>
+                <textarea id="message-template-text" class="studio-code-input" maxlength="3000" rows="15" spellcheck="false" aria-describedby="message-template-help"></textarea>
+                <p id="message-template-help" class="studio-help">Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Modo: {{modo}}</code>. Use <code>{{zoeira}}</code> para incluir um comentário.</p>
+                <div id="message-used-variables" class="studio-used-variables" aria-label="Campos usados no texto"></div>
+              </div>
+              <details id="message-phrases-details" class="studio-phrases-details"><summary><span><span aria-hidden="true">✦</span> Personalizar as zoeiras<small>Frases que entram em {{zoeira}}</small></span><span id="message-phrase-count" class="count-label"></span></summary><div class="studio-block studio-phrases-block">
+                <label class="sr-only" for="message-phrases-text">Frases da categoria selecionada, uma por linha</label>
+                <div id="message-category-tabs" class="studio-category-tabs" role="group" aria-label="Tipo de desempenho"></div>
+                <textarea id="message-phrases-text" class="studio-code-input studio-phrases-input" rows="6" maxlength="9029" spellcheck="true" aria-describedby="message-phrases-help"></textarea>
+                <p id="message-phrases-help" class="studio-help">Uma frase por linha, até 30 por categoria. Cada partida escolhe uma. As frases também aceitam variáveis, exceto <code>{{zoeira}}</code>.</p>
+              </div></details>
+            </div>
+            <div class="studio-preview-column">
+              <div class="studio-block studio-preview-controls">
+                <div class="studio-block-title"><h3><span class="studio-step">3</span> Veja o resultado</h3><span class="badge badge-neutral">Não envia</span></div>
+                <div class="field"><label for="message-preview-source">Dados para testar</label><select id="message-preview-source"><option value="">Partida de exemplo</option></select></div>
+                <div class="studio-scenario-row"><div class="field"><label for="message-preview-scenario">Cenário de exemplo</label><select id="message-preview-scenario"><option value="feed">Feedou · 1/5/9</option><option value="carry">Carregou · 15/2/8</option><option value="support">Suporte · 1/3/24</option><option value="normal">Partida normal</option></select></div><button id="refresh-message-matches" class="icon-button" type="button" aria-label="Atualizar partidas disponíveis" title="Atualizar partidas disponíveis">↻</button></div>
+                <div class="studio-phrase-preview-row"><span id="message-preview-category" class="studio-help">Frase conforme o desempenho</span><button id="next-message-phrase" class="text-link" type="button">Outra frase ↻</button></div>
+                <div class="studio-chat-window"><div class="studio-chat-header"><span class="studio-chat-avatar" aria-hidden="true">gg</span><div><strong>Grupo da resenha</strong><small>Prévia da sua mensagem</small></div><span aria-hidden="true">⋮</span></div><div class="studio-chat-body"><span id="message-preview-mode" class="studio-chat-mode">Modo da partida</span><div class="message-preview studio-message-preview"><div class="message-preview-top">GG Report <span>PRÉVIA</span></div><pre id="message-studio-preview" aria-live="polite">Carregando o editor…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div></div></div>
+                <p id="message-preview-error" class="inline-error studio-preview-error" role="status" hidden></p>
+                <p id="message-preview-meta" class="studio-help studio-preview-meta">A prévia usa seu rascunho. Salve para aplicar nas próximas partidas.</p>
+              </div>
+            </div>
+          </div>
+          <div class="studio-bottom"><p>Salvar vale para as próximas partidas detectadas. Mensagens que já estão na fila mantêm o texto original.</p><button id="restore-message-defaults" type="button" class="text-link">Carregar modelos originais ↺</button></div>
+        </fieldset>
+      </section>
+    </main>
+
+    <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span></div><p>GG Report is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p></footer>
+  </div>
+  <dialog id="message-dialog"><div class="dialog-header"><div><p class="eyebrow">MENSAGEM DA PARTIDA</p><h2 id="dialog-title">Resumo</h2></div><button id="close-dialog" class="icon-button" type="button" aria-label="Fechar mensagem">×</button></div><pre id="dialog-message"></pre><p id="dialog-meta"></p><button id="copy-message" class="button button-outline button-full" type="button">Copiar mensagem</button></dialog>
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
