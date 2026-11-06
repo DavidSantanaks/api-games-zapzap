@@ -26,7 +26,7 @@ Abra **http://localhost:3000**. Sem chave, a interface e as prévias funcionam; 
 4. Ajuste o intervalo de consulta (padrão: 120 segundos; mínimo: 30).
 5. Ative o monitor. Agora partidas novas são consultadas e enviadas automaticamente.
 
-O monitor começa pausado. As prévias de feed, carry e suporte são locais: **não gravam partidas nem enviam mensagens**. Nenhuma conta ou chave vem cadastrada.
+O monitor começa pausado. As prévias de zoeira, obrigação, elogio e suporte são locais: **não gravam partidas nem enviam mensagens**. Nenhuma conta ou chave vem cadastrada.
 
 Após alterar a chave ou outra variável do `.env`, recrie o container para aplicar:
 
@@ -44,15 +44,16 @@ Resultado: DERROTA 🔴
 Modo: Ranqueada Solo/Duo
 Player: SeuAmigo#BR1
 Frag: 1/5/9
+KDA: 2,00
 Personagem: Yasuo
 Farm: 124 CS
 Lane: MID
 GOLD: 10.000
 
-KKKKKKKKKKKKK FEEDOU DEMAIS
+NÃO FEZ MAIS QUE A OBRIGAÇÃO
 ```
 
-Bom desempenho recebe **“NÃO FEZ MAIS QUE A OBRIGAÇÃO”**. Suportes com muitas assistências têm frases próprias. Você pode editar as frases e os textos pela interface; não há custo de IA. A classificação é uma brincadeira baseada em K/D/A, e não uma avaliação completa da partida.
+O KDA decide se o comentário será zoeira, obrigação ou elogio moderado. Você pode editar as frases e os textos pela interface; não há custo de IA. A classificação é uma brincadeira baseada no placar da partida, e não uma avaliação completa do desempenho.
 
 ## Montar mensagens com variáveis
 
@@ -63,20 +64,33 @@ Abra **Mensagens** na interface para editar o texto que o bot envia. Use campos 
 Modo: {{modo}}
 {{player}} jogou de {{personagem}} na {{lane}}
 Frag: {{frag}} · Farm: {{farm}} · Gold: {{gold}}
+KDA: {{kda}}
 Tempo de jogo: {{duracao}}
 
 {{zoeira}}
 ```
 
-O editor já vem com três variações de mensagem completa e 28 frases distribuídas entre **Feedou**, **Carregou**, **Suporte** e **Normal**. Você pode criar, duplicar, renomear e editar variações, e marcar quais ficam ativas. Pelo menos uma precisa estar ativa. Entre as ativas, o bot seleciona uma variação e uma frase da categoria para cada partida; a escolha fica estável nas novas tentativas de envio.
+O editor já vem com três variações de mensagem completa e 28 frases distribuídas entre **Zoeira**, **Obrigação**, **Elogio** e **Elogio ao suporte**. Você pode criar, duplicar, renomear e editar variações, e marcar quais ficam ativas. Pelo menos uma precisa estar ativa. Entre as ativas, o bot seleciona uma variação e uma frase da categoria para cada partida; a escolha fica estável nas novas tentativas de envio.
 
 `{{modo}}` mostra um nome legível, como **Ranqueada Solo/Duo**, **Ranqueada Flex** ou **ARAM**. O sistema usa primeiro a fila da partida e depois o modo informado pela Riot como alternativa; assim, `CLASSIC` não faz uma ranqueada aparecer como apenas “clássico”. Os identificadores seguem a [lista de filas da Riot](https://static.developer.riotgames.com/docs/lol/queues.json). Partidas antigas que já guardam o identificador da fila também podem preencher o campo.
+
+`{{kda}}` mostra **(abates + assistências) ÷ máximo(1, mortes)**, calculado por partida. Quando o jogador não morreu, o divisor é 1. O texto usa duas casas decimais; a seleção da frase considera o valor completo, antes de arredondar.
+
+| KDA da partida | Comentário escolhido |
+| --- | --- |
+| Menor que 1 | Zoeira |
+| De 1 até abaixo de 2,5 | Obrigação: “NÃO FEZ MAIS QUE A OBRIGAÇÃO” |
+| A partir de 2,5 | Elogio moderado |
+
+Assistências entram no cálculo de todas as posições. Na faixa positiva, jogadores da lane `SUP` usam as frases de **Elogio ao suporte**; essa categoria não muda os limites de KDA. Por exemplo, `1/5/9` resulta em **2,00**, então recebe uma frase de obrigação, inclusive para suporte.
 
 Edite as frases com **uma frase por linha**. Elas também aceitam variáveis; por exemplo, `{{nick}}, terminou {{frag}} de {{personagem}}? KKKKK`. A variável `{{zoeira}}` pertence ao texto completo e insere a frase escolhida; não pode ser usada dentro das próprias frases.
 
 Enquanto você escreve, a prévia usa o rascunho sem salvar. Escolha entre os quatro exemplos de desempenho ou uma partida já existente no histórico para conferir os valores reais registrados. **A prévia não consulta a Riot nem envia mensagens ao WhatsApp.** Campos desconhecidos e expressões inválidas aparecem como erro para você corrigir antes de salvar. As variáveis são substituições simples de texto; não executam JavaScript nem expressões do n8n.
 
 Clique em **Salvar mensagens** para aplicar às próximas partidas detectadas. **Carregar modelos originais** apenas carrega os modelos no rascunho; salve se quiser aplicá-los. As alterações ficam no SQLite e continuam após reiniciar o container. Mensagens que já estavam na fila mantêm o texto registrado quando foram criadas.
+
+Ao atualizar esta versão, somente as listas de frases que ainda correspondem exatamente aos padrões antigos são adaptadas aos novos tons de KDA. Frases personalizadas são preservadas. A atualização não reescreve o texto de mensagens já na fila.
 
 ## Como funciona
 

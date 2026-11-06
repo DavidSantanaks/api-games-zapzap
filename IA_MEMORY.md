@@ -29,7 +29,7 @@ Atualizada em **06/11/2026**. Leia este arquivo e o [README](README.md) antes de
 
 ## Editor de mensagens
 
-- **22 variáveis**, três modelos completos e 28 frases iniciais em quatro categorias: feed, carry, suporte e normal.
+- **22 variáveis**, três modelos completos e 28 frases iniciais em quatro grupos: zoeira (`feed`), obrigação (`normal`), elogio (`carry`) e elogio ao suporte (`support`).
 - Até dez modelos; é necessário manter ao menos um ativo. A escolha de modelo/frase é determinística por partida.
 - Criar, duplicar, renomear, ativar, remover e editar modelos; frases com uma por linha.
 - Campos com busca, filtros por grupo, valores de exemplo/da prévia e inserção por clique ou arrastar.
@@ -52,6 +52,17 @@ duracao, duracao_segundos, data, partida_id, zoeira
 
 `{{modo}}` usa primeiro `queueId`, diferenciando Ranqueada Solo/Duo, Flex, Normal, ARAM e outras filas conhecidas. Sem fila conhecida, usa o modo da Riot ou um identificador explícito. Funciona também em registros antigos que tenham `queueId`.
 
+### Seleção de frases pelo KDA
+
+- `{{kda}}` já existia e agora também orienta a seleção da frase. O cálculo único é `(abates + assistências) / máximo(1, mortes)`, por partida.
+- **KDA < 1:** `feed`, zoeira.
+- **1 ≤ KDA < 2,5:** `normal`, obrigação. O padrão começa com “NÃO FEZ MAIS QUE A OBRIGAÇÃO”.
+- **KDA ≥ 2,5:** `carry`, elogio moderado; na lane `SUP`, usa `support`, um subgrupo positivo com os mesmos limites.
+- Os intervalos intermediários não especificados inicialmente ficaram na faixa de obrigação; exatamente 2,5 inicia o elogio. Assistências contam em todas as posições.
+- O valor exibido tem duas casas decimais em pt-BR. Os limites usam o cálculo sem arredondar, para não alterar a faixa pelo formato do texto.
+- `1/5/9` tem KDA 2,00 e recebe obrigação. O exemplo de zoeira foi alterado para `1/8/3`, KDA 0,50.
+- Prévias retornam `performance` com KDA numérico, faixa, rótulo e intervalo, sem gravação ou envio.
+
 ## Regras de preservação importantes
 
 - Cada entrada da fila guarda o texto e o grupo de destino no momento em que a partida é detectada.
@@ -61,6 +72,7 @@ duracao, duracao_segundos, data, partida_id, zoeira
 - Remover um jogador cancela seus envios pendentes e preserva o histórico.
 - A migração `message-presets-mode-v1` acrescenta modo somente aos textos originais intactos dos modelos.
 - Essa migração roda uma vez e preserva textos personalizados, nomes, ativação e frases; remover modo depois é uma edição válida do usuário.
+- A migração única `message-kda-bands-v1` substitui apenas listas que coincidam integralmente com os padrões anteriores; listas personalizadas e mensagens já na fila permanecem preservadas. Se um modelo personalizado estiver próximo do limite de tamanho, a migração mantém uma lista antiga quando substituí-la invalidaria o modelo, preservando a inicialização do aplicativo.
 - Encerrar o processo preserva a sessão do WhatsApp. Desconectar pela interface encerra a sessão e pausa o monitor.
 - Baileys é uma integração **não oficial**, atualmente fixada em `7.0.0-rc14`. Não há garantia de entrega exatamente uma vez após falhas de rede/processo.
 
@@ -101,7 +113,7 @@ Credenciais ficam no ambiente, nunca no frontend. `APP_PASSWORD` oferece HTTP Ba
 
 ## Validação conhecida
 
-- Última entrega funcional: **71 testes passando**, tanto no Windows quanto dentro do container Linux.
+- Última entrega: **77 testes passando**, tanto no Windows quanto dentro do container Linux, incluindo faixas de KDA, precisão sem arredondar, zero mortes e migração das frases.
 - `npm run check` passou; container com healthcheck saudável e rotas/arquivos atualizados verificados por HTTP.
 - Interações do editor foram verificadas em DOM simulado: busca, grupos, cursor, arrastar/soltar, foco/Escape, rascunho e salvamento.
 - A revisão visual em navegador real ficou indisponível na sessão por falha do serviço de controle do navegador; não afirmar que foi realizada.
