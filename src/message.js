@@ -154,7 +154,6 @@ const DEFAULT_CONFIG = {
 
 export function getDefaultMessageConfig() { return structuredClone(DEFAULT_CONFIG); }
 export function getLegacyPhrasePools() { return structuredClone(LEGACY_PHRASE_POOLS); }
-
 function record(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
@@ -166,7 +165,7 @@ function assertKeys(value, expected, label) {
     throw new MessageConfigError(`${label} tem campos ausentes ou não permitidos.`);
   }
 }
-function validateText(text, { label, max, phrase = false }) {
+function validateText(text, { label, max, phrase = false }, allowedKeys = VARIABLE_KEYS) {
   if (typeof text !== 'string' || !text.trim() || text.length > max) {
     throw new MessageConfigError(`${label} deve ter entre 1 e ${max} caracteres.`);
   }
@@ -175,7 +174,7 @@ function validateText(text, { label, max, phrase = false }) {
   let token;
   while ((token = tokens.exec(text)) !== null) {
     const key = token[1].trim();
-    if (!/^[a-z][a-z0-9_]*$/.test(key) || !VARIABLE_KEYS.has(key)) {
+    if (!/^[a-z][a-z0-9_]*$/.test(key) || !allowedKeys.has(key)) {
       throw new MessageConfigError(`${label}: variável não permitida: ${token[0]}. Use os campos da lista.`);
     }
     if (phrase && key === 'zoeira') throw new MessageConfigError(`${label}: {{zoeira}} só pode ser usado no modelo da mensagem.`);
@@ -195,59 +194,21 @@ function estimatedLength(text, budgets) {
   return length;
 }
 
-function validateExpansionLengths(templates, phrases) {
-  const phraseBudgets = Object.fromEntries(CATEGORIES.map(category => [
-    category, Math.max(...phrases[category].map(phrase => estimatedLength(phrase, VALUE_LENGTH_BUDGETS))),
-  ]));
-  for (const template of templates) {
-    for (const category of CATEGORIES) {
-      if (estimatedLength(template.text, { ...VALUE_LENGTH_BUDGETS, zoeira: phraseBudgets[category] }) > 10000) {
-        throw new MessageConfigError(`A variação “${template.name}” pode ultrapassar 10.000 caracteres ao preencher os dados e a zoeira. Reduza a repetição de campos ou frases.`);
-      }
-    }
-  }
-}
-
-export function validateMessageConfig(config) {
-  assertKeys(config, ['templates', 'phrases'], 'A configuração das mensagens');
-  if (!Array.isArray(config.templates) || config.templates.length < 1 || config.templates.length > 10) {
-    throw new MessageConfigError('Cadastre entre 1 e 10 variações de mensagem.');
-  }
-  const ids = new Set();
-  const templates = config.templates.map((template, index) => {
-    const label = `A variação ${index + 1}`;
-    assertKeys(template, ['id', 'name', 'enabled', 'text'], label);
-    if (typeof template.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(template.id) || ids.has(template.id)) {
-      throw new MessageConfigError(`${label} precisa de um identificador válido e exclusivo.`);
-    }
-    ids.add(template.id);
-    if (typeof template.name !== 'string' || !template.name.trim() || template.name.trim().length > 60) {
-      throw new MessageConfigError(`${label} precisa de um nome com até 60 caracteres.`);
-    }
-    if (typeof template.enabled !== 'boolean') throw new MessageConfigError(`${label} precisa informar se está ativa.`);
-    return {
-      id: template.id, name: template.name.trim(), enabled: template.enabled,
-      text: validateText(template.text, { label: `O texto de “${template.name.trim()}”`, max: 3000 }),
-    };
-  });
-  if (!templates.some(template => template.enabled)) throw new MessageConfigError('Mantenha pelo menos uma variação de mensagem ativa.');
-  assertKeys(config.phrases, CATEGORIES, 'As categorias de zoeira');
-  const phrases = {};
-  for (const category of CATEGORIES) {
-    const pool = config.phrases[category];
-    if (!Array.isArray(pool) || pool.length < 1 || pool.length > 30) {
-      throw new MessageConfigError(`A categoria ${category} deve ter entre 1 e 30 frases.`);
-    }
-    phrases[category] = pool.map((phrase, index) => validateText(phrase, {
-      label: `A frase ${index + 1} da categoria ${category}`, max: 300, phrase: true,
-    }).trim());
-  }
-  validateExpansionLengths(templates, phrases);
-  return { templates, phrases };
-}
-
+/** Fórmula única de KDA, compartilhada por todos os jogos: (abates + assistências) / máx(1, mortes). */
 export function calculateKda(match = {}) {
   return (integer(match.kills) + integer(match.assists)) / Math.max(1, integer(match.deaths));
+}
+export const formatKda = match => calculateKda(match).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export function formatMatchDate(value) {
+  const end = new Date(value);
+  return Number.isNaN(end.getTime()) ? 'N/A' : new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(end);
+}
+export function splitPlayerName(value) {
+  const player = String(value || 'Jogador');
+  const separator = player.lastIndexOf('#');
+  return { player, nick: separator < 0 ? player : player.slice(0, separator), tag: separator < 0 ? '' : player.slice(separator + 1) };
 }
 
 export function classifyPerformance(match) {
@@ -269,48 +230,20 @@ function render(text, values) {
 function matchValues(match) {
   const kills = integer(match.kills), deaths = integer(match.deaths), assists = integer(match.assists);
   const seconds = integer(match.durationSeconds);
-  const player = String(match.playerName || 'Jogador');
-  const separator = player.lastIndexOf('#');
-  const end = new Date(match.endedAt);
-  const formattedDate = Number.isNaN(end.getTime()) ? 'N/A' : new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(end);
+  const { player, nick, tag } = splitPlayerName(match.playerName);
   return {
     jogo: 'LOL', modo: gameModeLabel(match), resultado: match.win ? 'VITÓRIA' : 'DERROTA', resultado_emoji: match.win ? '🟢' : '🔴',
-    player, nick: separator < 0 ? player : player.slice(0, separator), tag: separator < 0 ? '' : player.slice(separator + 1),
+    player, nick, tag,
     frag: `${kills}/${deaths}/${assists}`, kills: String(kills), deaths: String(deaths), assists: String(assists),
-    kda: calculateKda(match).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    kda: formatKda(match),
     personagem: String(match.champion || 'Desconhecido'), farm: String(integer(match.cs)), lane: String(match.lane || 'N/A'),
     gold: integer(match.gold).toLocaleString('pt-BR'), gold_bruto: String(integer(match.gold)),
     duracao: `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`,
-    duracao_segundos: String(seconds), data: formattedDate, partida_id: String(match.riotMatchId || match.id || 'N/A'),
+    duracao_segundos: String(seconds), data: formatMatchDate(match.endedAt), partida_id: String(match.riotMatchId || match.id || 'N/A'),
   };
 }
 
-export function formatMessage(match, { config, phrase, templateId, phraseIndex } = {}) {
-  const selectedConfig = validateMessageConfig(config === undefined ? getDefaultMessageConfig() : config);
-  const category = classifyPerformance(match);
-  const seed = String(match.riotMatchId || match.id || match.playerName || 'partida');
-  const enabled = selectedConfig.templates.filter(template => template.enabled);
-  const template = templateId === undefined
-    ? enabled[config === undefined ? 0 : selectIndex(`modelo:${seed}`, enabled.length)]
-    : selectedConfig.templates.find(template => template.id === templateId);
-  if (!template) throw new MessageConfigError('Variação de mensagem não encontrada.');
-  const pool = selectedConfig.phrases[category];
-  if (phraseIndex !== undefined && (!Number.isInteger(phraseIndex) || phraseIndex < 0 || phraseIndex >= pool.length)) {
-    throw new MessageConfigError('Escolha uma frase válida para a categoria desta partida.');
-  }
-  const selectedPhraseIndex = phraseIndex ?? (config === undefined ? 0 : selectIndex(`frase:${category}:${seed}`, pool.length));
-  const phraseText = phrase === undefined ? pool[selectedPhraseIndex]
-    : validateText(phrase, { label: 'A frase personalizada', max: 300, phrase: true });
-  const values = matchValues(match);
-  values.zoeira = render(phraseText, values);
-  const message = render(template.text, values);
-  if (message.length > 10000) throw new MessageConfigError('A mensagem pronta excede 10.000 caracteres. Reduza o modelo ou a frase.');
-  return { message, category, templateId: template.id, templateName: template.name, phraseIndex: selectedPhraseIndex, values };
-}
-
-export function createPreview(scenario = 'feed', options = {}) {
+function lolPreviewMatch(scenario) {
   const scenarios = {
     feed: { champion: 'Yasuo', kills: 1, deaths: 8, assists: 3, cs: 124, gold: 10_000, lane: 'MID', win: false },
     carry: { champion: 'Jinx', kills: 15, deaths: 2, assists: 8, cs: 242, gold: 18_500, lane: 'ADC', win: true },
@@ -318,10 +251,126 @@ export function createPreview(scenario = 'feed', options = {}) {
     normal: { champion: 'Yasuo', kills: 1, deaths: 5, assists: 9, cs: 124, gold: 10_000, lane: 'MID', win: false },
   };
   if (!Object.hasOwn(scenarios, scenario)) throw new MessageConfigError('Escolha uma prévia: feed, carry, support ou normal.');
-  const match = {
+  return {
     id: `preview-${scenario}`, playerName: 'SeuAmigo#BR1',
     durationSeconds: 1800, endedAt: new Date().toISOString(), queueId: 420, gameMode: 'CLASSIC',
     ...scenarios[scenario],
   };
-  return { match, ...formatMessage(match, options) };
 }
+
+/**
+ * Motor de mensagens de um jogo. Cada jogo fornece o próprio perfil (variáveis, categorias de zoeira,
+ * modelos padrão, valores da partida e prévias); validação, escolha determinística e renderização são comuns.
+ */
+export function createMessageEngine(profile) {
+  const { game, variables, categories, budgets, defaults, values: valuesFor, classify, previewMatch, ui } = profile;
+  const keys = new Set(variables.map(variable => variable.key));
+
+  function validateExpansionLengths(templates, phrases) {
+    const phraseBudgets = Object.fromEntries(categories.map(category => [
+      category, Math.max(...phrases[category].map(phrase => estimatedLength(phrase, budgets))),
+    ]));
+    for (const template of templates) {
+      for (const category of categories) {
+        if (estimatedLength(template.text, { ...budgets, zoeira: phraseBudgets[category] }) > 10000) {
+          throw new MessageConfigError(`A variação “${template.name}” pode ultrapassar 10.000 caracteres ao preencher os dados e a zoeira. Reduza a repetição de campos ou frases.`);
+        }
+      }
+    }
+  }
+
+  function validateConfig(config) {
+    assertKeys(config, ['templates', 'phrases'], 'A configuração das mensagens');
+    if (!Array.isArray(config.templates) || config.templates.length < 1 || config.templates.length > 10) {
+      throw new MessageConfigError('Cadastre entre 1 e 10 variações de mensagem.');
+    }
+    const ids = new Set();
+    const templates = config.templates.map((template, index) => {
+      const label = `A variação ${index + 1}`;
+      assertKeys(template, ['id', 'name', 'enabled', 'text'], label);
+      if (typeof template.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(template.id) || ids.has(template.id)) {
+        throw new MessageConfigError(`${label} precisa de um identificador válido e exclusivo.`);
+      }
+      ids.add(template.id);
+      if (typeof template.name !== 'string' || !template.name.trim() || template.name.trim().length > 60) {
+        throw new MessageConfigError(`${label} precisa de um nome com até 60 caracteres.`);
+      }
+      if (typeof template.enabled !== 'boolean') throw new MessageConfigError(`${label} precisa informar se está ativa.`);
+      return {
+        id: template.id, name: template.name.trim(), enabled: template.enabled,
+        text: validateText(template.text, { label: `O texto de “${template.name.trim()}”`, max: 3000 }, keys),
+      };
+    });
+    if (!templates.some(template => template.enabled)) throw new MessageConfigError('Mantenha pelo menos uma variação de mensagem ativa.');
+    assertKeys(config.phrases, categories, 'As categorias de zoeira');
+    const phrases = {};
+    for (const category of categories) {
+      const pool = config.phrases[category];
+      if (!Array.isArray(pool) || pool.length < 1 || pool.length > 30) {
+        throw new MessageConfigError(`A categoria ${category} deve ter entre 1 e 30 frases.`);
+      }
+      phrases[category] = pool.map((phrase, index) => validateText(phrase, {
+        label: `A frase ${index + 1} da categoria ${category}`, max: 300, phrase: true,
+      }, keys).trim());
+    }
+    validateExpansionLengths(templates, phrases);
+    return { templates, phrases };
+  }
+
+  function formatMessage(match, { config, phrase, templateId, phraseIndex } = {}) {
+    const selectedConfig = validateConfig(config === undefined ? structuredClone(defaults) : config);
+    const category = classify(match);
+    const seed = String(match.riotMatchId || match.id || match.playerName || 'partida');
+    const enabled = selectedConfig.templates.filter(template => template.enabled);
+    const template = templateId === undefined
+      ? enabled[config === undefined ? 0 : selectIndex(`modelo:${seed}`, enabled.length)]
+      : selectedConfig.templates.find(template => template.id === templateId);
+    if (!template) throw new MessageConfigError('Variação de mensagem não encontrada.');
+    const pool = selectedConfig.phrases[category];
+    if (phraseIndex !== undefined && (!Number.isInteger(phraseIndex) || phraseIndex < 0 || phraseIndex >= pool.length)) {
+      throw new MessageConfigError('Escolha uma frase válida para a categoria desta partida.');
+    }
+    const selectedPhraseIndex = phraseIndex ?? (config === undefined ? 0 : selectIndex(`frase:${category}:${seed}`, pool.length));
+    const phraseText = phrase === undefined ? pool[selectedPhraseIndex]
+      : validateText(phrase, { label: 'A frase personalizada', max: 300, phrase: true }, keys);
+    const values = valuesFor(match);
+    values.zoeira = render(phraseText, values);
+    const message = render(template.text, values);
+    if (message.length > 10000) throw new MessageConfigError('A mensagem pronta excede 10.000 caracteres. Reduza o modelo ou a frase.');
+    return { message, category, templateId: template.id, templateName: template.name, phraseIndex: selectedPhraseIndex, values };
+  }
+
+  function createPreview(scenario = 'feed', options = {}) {
+    const match = previewMatch(scenario);
+    return { match, ...formatMessage(match, options) };
+  }
+
+  return {
+    game, variables, categories, ui, classify, validateConfig, formatMessage, createPreview,
+    defaultConfig: () => structuredClone(defaults),
+  };
+}
+
+const lolEngine = createMessageEngine({
+  game: 'lol', variables: MESSAGE_VARIABLES, categories: CATEGORIES, budgets: VALUE_LENGTH_BUDGETS,
+  defaults: DEFAULT_CONFIG, values: matchValues, classify: classifyPerformance, previewMatch: lolPreviewMatch,
+  ui: {
+    categories: [
+      { key: 'feed', label: 'Zoeira', range: 'KDA < 1', band: 'feed' },
+      { key: 'normal', label: 'Obrigação', range: '1 ≤ KDA < 2,5', band: 'normal' },
+      { key: 'carry', label: 'Elogio', range: 'KDA ≥ 2,5', band: 'carry' },
+      { key: 'support', label: 'Elogio ao suporte', range: 'KDA ≥ 2,5 · SUP', band: 'carry' },
+    ],
+    scenarios: [
+      { key: 'feed', label: 'Zoeira · 1/8/3 · KDA 0,50' },
+      { key: 'normal', label: 'Obrigação · 1/5/9 · KDA 2,00' },
+      { key: 'carry', label: 'Elogio · 15/2/8 · KDA 11,50' },
+      { key: 'support', label: 'Elogio ao suporte · 1/3/24 · KDA 8,33' },
+    ],
+  },
+});
+
+export const lolMessages = lolEngine;
+export const validateMessageConfig = lolEngine.validateConfig;
+export const formatMessage = lolEngine.formatMessage;
+export const createPreview = lolEngine.createPreview;

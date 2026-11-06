@@ -1,4 +1,5 @@
 import { gameModeLabel } from './game-mode.js';
+import { nonempty, number, retryDelay } from './http.js';
 
 const REGIONS = new Set(['americas', 'europe', 'asia', 'sea']);
 
@@ -11,19 +12,9 @@ export class RiotError extends Error {
   }
 }
 
-const number = value => Math.max(0, Math.floor(Number(value) || 0));
-const nonempty = value => typeof value === 'string' && value.trim().length > 0;
-
 function regionHost(region) {
   if (!REGIONS.has(region)) throw new RiotError('Região inválida. Escolha Américas, Europa, Ásia ou SEA.');
   return `https://${region}.api.riotgames.com`;
-}
-
-function retryDelay(value) {
-  let milliseconds = 60_000;
-  if (value && /^\d+(\.\d+)?$/.test(value.trim())) milliseconds = Number(value) * 1000;
-  else if (value && Number.isFinite(Date.parse(value))) milliseconds = Date.parse(value) - Date.now();
-  return Math.min(86_400_000, Math.max(1000, milliseconds));
 }
 
 function durationSeconds(info) {
