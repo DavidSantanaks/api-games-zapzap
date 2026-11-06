@@ -1,30 +1,76 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classifyPerformance, formatMessage, createPreview, getDefaultMessageConfig,
+  calculateKda, classifyPerformance, formatMessage, createPreview, getDefaultMessageConfig, getLegacyPhrasePools,
   validateMessageConfig, MESSAGE_VARIABLES, MessageConfigError,
 } from '../src/message.js';
 
-test('requested 1/5/9 example receives feeder roast', () => {
+test('a KDA below one receives a feeder roast', () => {
   const result = createPreview('feed');
   assert.equal(result.category, 'feed');
-  assert.match(result.message, /Frag: 1\/5\/9/);
+  assert.equal(result.values.kda, '0,50');
+  assert.match(result.message, /Frag: 1\/8\/3/);
   assert.match(result.message, /FEEDOU DEMAIS/);
   assert.match(result.message, /Resultado: DERROTA/);
   assert.match(result.message, /GOLD: 10\.000/);
   assert.match(result.message, /Modo: Ranqueada Solo\/Duo/);
 });
 
-test('strong support assistance is recognized even with few kills', () => {
+test('support assistance contributes to the same KDA bands before its positive phrase subgroup', () => {
   assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 20 }), 'support');
   assert.equal(createPreview('support').category, 'support');
-  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 9 }), 'feed');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 9 }), 'normal');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 8, assists: 3 }), 'feed');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 12 }), 'support');
 });
 
-test('carry roast and zero-death performance do not divide by zero', () => {
-  assert.match(createPreview('carry').message, /NÃO FEZ MAIS QUE A OBRIGAÇÃO/);
+test('moderate performance receives obligation and higher KDA receives restrained praise', () => {
+  const normal = createPreview('normal');
+  assert.equal(normal.values.frag, '1/5/9');
+  assert.equal(normal.values.kda, '2,00');
+  assert.equal(normal.category, 'normal');
+  assert.ok(normal.message.endsWith('NÃO FEZ MAIS QUE A OBRIGAÇÃO'));
+  assert.ok(createPreview('carry').message.endsWith('JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK'));
   assert.equal(classifyPerformance({ kills: 7, deaths: 0, assists: 2, lane: 'MID' }), 'carry');
-  assert.equal(classifyPerformance({ kills: 0, deaths: 0, assists: 0 }), 'normal');
+  assert.equal(classifyPerformance({ kills: 0, deaths: 0, assists: 0 }), 'feed');
+});
+
+test('KDA thresholds have no gaps and compare the full numeric ratio', () => {
+  for (const [kills, deaths, expectedKda, category] of [
+    [99, 100, 0.99, 'feed'], [1, 1, 1, 'normal'], [149, 100, 1.49, 'normal'],
+    [3, 2, 1.5, 'normal'], [2, 1, 2, 'normal'], [249, 100, 2.49, 'normal'],
+    [5, 2, 2.5, 'carry'], [251, 100, 2.51, 'carry'],
+  ]) {
+    const match = Object.freeze({ kills, deaths, assists: 0, lane: 'MID' });
+    assert.equal(calculateKda(match), expectedKda);
+    assert.equal(classifyPerformance(match), category, String(expectedKda));
+  }
+  const roundsToUpperBand = { kills: 499, deaths: 200, assists: 0, lane: 'MID' };
+  assert.equal(formatMessage(roundsToUpperBand).values.kda, '2,50');
+  assert.equal(classifyPerformance(roundsToUpperBand), 'normal');
+  assert.equal(classifyPerformance({ kills: 199, deaths: 200, assists: 0 }), 'feed');
+});
+
+test('KDA calculation handles assists, zero deaths and missing or invalid stats consistently', () => {
+  for (const [input, expected] of [
+    [{ kills: 1, deaths: 5, assists: 9 }, 2],
+    [{ kills: 7, deaths: 0, assists: 2 }, 9],
+    [{ kills: 1, deaths: 0, assists: 0 }, 1],
+    [{ kills: 0, deaths: 0, assists: 0 }, 0],
+    [{}, 0], [{ kills: NaN, deaths: Infinity, assists: -3 }, 0],
+  ]) assert.equal(calculateKda(input), expected);
+  assert.equal(calculateKda(), 0);
+  assert.equal(classifyPerformance({ kills: 20, deaths: 100, assists: 0 }), 'feed');
+});
+
+test('legacy phrase pools are immutable migration snapshots with the previous exact wording', () => {
+  const previous = getLegacyPhrasePools();
+  assert.equal(previous.carry[0], 'NÃO FEZ MAIS QUE A OBRIGAÇÃO');
+  assert.equal(previous.normal[0], 'O IMPORTANTE É SE DIVERTIR... FOI DIVERTIDO PRA QUEM? KKKKK');
+  assert.deepEqual(Object.values(previous).map(pool => pool.length), [8, 8, 6, 6]);
+  previous.carry[0] = 'Alterado pelo chamador';
+  assert.equal(getLegacyPhrasePools().carry[0], 'NÃO FEZ MAIS QUE A OBRIGAÇÃO');
+  assert.notEqual(getDefaultMessageConfig().phrases.carry[0], getLegacyPhrasePools().carry[0]);
 });
 
 test('message contains required summary fields and optional custom phrase', () => {
@@ -74,7 +120,7 @@ test('all catalog variables resolve with locale, duration and stored Riot match 
   assert.equal(result.values.gold_bruto, '10000');
   assert.equal(result.values.duracao, '30:00');
   assert.equal(result.values.duracao_segundos, '1800');
-  assert.equal(result.values.kda, '2,00');
+  assert.equal(result.values.kda, '0,50');
   assert.equal(result.values.partida_id, 'BR1_real');
   assert.equal(result.values.modo, 'Ranqueada Solo/Duo');
   assert.equal(result.values.data, '06/11/2026, 09:34');
@@ -99,7 +145,7 @@ test('API data and phrase substitutions stay literal and cannot become nested ex
   config.templates[0].text = '{{player}}\n{{personagem}}\n{{zoeira}}';
   config.phrases.feed = ['{{nick}} continua com {{frag}}'];
   const result = formatMessage({ ...match, playerName: '{{gold}}<script>$&#BR1', champion: '{{kills}}' }, { config });
-  assert.equal(result.message, '{{gold}}<script>$&#BR1\n{{kills}}\n{{gold}}<script>$& continua com 1/5/9');
+  assert.equal(result.message, '{{gold}}<script>$&#BR1\n{{kills}}\n{{gold}}<script>$& continua com 1/8/3');
 });
 
 test('multiple active templates and phrase pools vary deterministically between matches', () => {

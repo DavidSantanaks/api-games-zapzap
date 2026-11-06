@@ -1,7 +1,7 @@
 import express from 'express';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createPreview, formatMessage, getDefaultMessageConfig, MESSAGE_VARIABLES, validateMessageConfig } from './message.js';
+import { calculateKda, createPreview, formatMessage, getDefaultMessageConfig, MESSAGE_VARIABLES, validateMessageConfig } from './message.js';
 import { gameModeLabel } from './game-mode.js';
 
 class HttpError extends Error {
@@ -11,10 +11,18 @@ const fail = (status, message) => { throw new HttpError(status, message); };
 const publicPlayer = ({ puuid, lastSeenMatchId, ...player }) => player;
 const validGroup = id => typeof id === 'string' && /^\d+(?:-\d+)?@g\.us$/.test(id);
 const MESSAGE_CATEGORIES = [
-  { key: 'feed', label: 'Feedou' }, { key: 'carry', label: 'Carregou' },
-  { key: 'support', label: 'Suporte' }, { key: 'normal', label: 'Partida normal' },
+  { key: 'feed', label: 'Zoeira', range: 'KDA < 1', band: 'feed' },
+  { key: 'normal', label: 'Obrigação', range: '1 ≤ KDA < 2,5', band: 'normal' },
+  { key: 'carry', label: 'Elogio', range: 'KDA ≥ 2,5', band: 'carry' },
+  { key: 'support', label: 'Elogio ao suporte', range: 'KDA ≥ 2,5 · SUP', band: 'carry' },
 ];
 const messageConfigResponse = config => ({ config, variables: MESSAGE_VARIABLES, categories: MESSAGE_CATEGORIES });
+const withPerformance = preview => {
+  const category = MESSAGE_CATEGORIES.find(category => category.key === preview.category);
+  return { ...preview, performance: {
+    kda: calculateKda(preview.match), band: category.band, label: category.label, range: category.range,
+  } };
+};
 
 export function createApp({ store, riot, whatsapp, monitor, password = '', logger = console }) {
   const app = express();
@@ -91,9 +99,9 @@ export function createApp({ store, riot, whatsapp, monitor, password = '', logge
       const match = Object.fromEntries(['playerName', 'champion', 'kills', 'deaths', 'assists', 'cs', 'gold', 'lane', 'win', 'durationSeconds', 'endedAt', 'queueId', 'gameMode', 'mode']
         .map(key => [key, entry[key]]));
       match.id = entry.riotMatchId || entry.id;
-      return res.json({ match, ...formatMessage(match, options) });
+      return res.json(withPerformance({ match, ...formatMessage(match, options) }));
     }
-    res.json(createPreview(scenario, options));
+    res.json(withPerformance(createPreview(scenario, options)));
   });
 
   app.post('/api/players', async (req, res) => {
@@ -165,7 +173,7 @@ export function createApp({ store, riot, whatsapp, monitor, password = '', logge
   });
   app.post('/api/preview', (req, res) => {
     if (!MESSAGE_CATEGORIES.some(category => category.key === req.body.scenario)) fail(400, 'Escolha feed, carry, support ou normal para a prévia.');
-    res.json(createPreview(req.body.scenario, { config: store.messageConfig() }));
+    res.json(withPerformance(createPreview(req.body.scenario, { config: store.messageConfig() })));
   });
   app.post('/api/whatsapp/connect', async (_req, res) => {
     await whatsappCall(() => whatsapp.start());

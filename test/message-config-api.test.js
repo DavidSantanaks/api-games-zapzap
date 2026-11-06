@@ -98,7 +98,7 @@ test('message editor exposes defaults and a variable catalog without changing ex
   assert.equal(response.data.config.templates.length, 3);
   assert.ok(response.data.config.templates.some(template => template.enabled));
   assert.deepEqual(new Set(response.data.categories.map(category => category.key)), new Set(['feed', 'carry', 'support', 'normal']));
-  for (const key of ['player', 'lane', 'frag', 'personagem', 'farm', 'gold', 'zoeira', 'partida_id']) {
+  for (const key of ['player', 'lane', 'frag', 'kda', 'personagem', 'farm', 'gold', 'zoeira', 'partida_id']) {
     const variable = response.data.variables.find(variable => variable.key === key);
     assert.ok(variable, `missing ${key}`);
     assert.equal(typeof variable.example, 'string');
@@ -133,10 +133,13 @@ test('unsaved draft preview expands API fields and phrases without changing reco
   assert.equal(response.status, 200);
   assert.equal(response.data.templateId, 'personalizada');
   assert.equal(response.data.category, 'feed');
-  assert.match(response.data.message, /SeuAmigo#BR1 foi de Yasuo na MID: 1\/5\/9/);
-  assert.match(response.data.message, /SeuAmigo, 5 mortes\? O Yasuo pediu reembolso/);
+  assert.match(response.data.message, /SeuAmigo#BR1 foi de Yasuo na MID: 1\/8\/3/);
+  assert.match(response.data.message, /SeuAmigo, 8 mortes\? O Yasuo pediu reembolso/);
   assert.equal(response.data.values.lane, 'MID');
-  assert.equal(response.data.values.frag, '1/5/9');
+  assert.equal(response.data.values.frag, '1/8/3');
+  assert.equal(response.data.values.kda, '0,50');
+  assert.equal(response.data.performance.kda, 0.5);
+  assert.equal(response.data.performance.band, 'feed');
   assert.deepEqual(await app.config(), saved);
   assert.deepEqual(app.store.settings(), settingsBefore);
   assert.deepEqual(app.store.players(), []);
@@ -224,7 +227,7 @@ test('saved message configuration reaches automatic match processing and retries
   const failed = app.store.matches()[0];
   assert.equal(failed.status, 'failed');
   assert.match(failed.message, /Amigo#BR1 foi de Lulu na SUP: 1\/5\/9/);
-  assert.match(failed.message, /Amigo, 5 mortes\? O Lulu pediu reembolso/);
+  assert.match(failed.message, /Mais uma pra conta de Amigo#BR1/);
   const replacement = customized(custom, 'NOVO TEXTO PARA AS PRÓXIMAS: {{player}}');
   assert.equal((await app.request('/api/message-config', 'PUT', { config: replacement })).status, 200);
   app.store.updateDelivery(failed.id, { nextAttemptAt: 0 });
@@ -238,6 +241,42 @@ test('saved message configuration reaches automatic match processing and retries
   app.setHistory(['BR1_2', 'BR1_1', 'BR1_0']);
   await app.monitor.check();
   assert.equal(app.calls.sends.at(-1).message, 'NOVO TEXTO PARA AS PRÓXIMAS: Amigo#BR1');
+});
+
+test('stored-match KDA chooses roast, obligation and positive pools without rewriting custom text or queued entries', async t => {
+  const app = await fixture(t);
+  const player = app.addPlayer();
+  const draft = customized(await app.config(), 'KDA: {{kda}} | {{zoeira}}');
+  draft.phrases = {
+    feed: ['ZOEIRA para {{nick}}'],
+    normal: ['NÃO FEZ MAIS QUE A OBRIGAÇÃO'],
+    carry: ['ELOGIO MODERADO para {{nick}}'],
+    support: ['ELOGIO AO SUP com {{assists}} assistências'],
+  };
+  assert.equal((await app.request('/api/message-config', 'PUT', { config: draft })).status, 200);
+  const cases = [
+    { kills: 1, deaths: 8, assists: 3, lane: 'SUP', kda: 0.5, category: 'feed', band: 'feed', phrase: 'ZOEIRA para Amigo' },
+    { kills: 1, deaths: 5, assists: 9, lane: 'SUP', kda: 2, category: 'normal', band: 'normal', phrase: 'NÃO FEZ MAIS QUE A OBRIGAÇÃO' },
+    { kills: 2, deaths: 2, assists: 3, lane: 'MID', kda: 2.5, category: 'carry', band: 'carry', phrase: 'ELOGIO MODERADO para Amigo' },
+    { kills: 2, deaths: 2, assists: 3, lane: 'SUP', kda: 2.5, category: 'support', band: 'carry', phrase: 'ELOGIO AO SUP com 3 assistências' },
+    { kills: 3, deaths: 0, assists: 1, lane: 'MID', kda: 4, category: 'carry', band: 'carry', phrase: 'ELOGIO MODERADO para Amigo' },
+  ];
+  for (const [index, sample] of cases.entries()) {
+    const { kills, deaths, assists, lane } = sample;
+    const entry = app.store.addMatch(player, matchSummary(`BR1_kda_${index}`, { kills, deaths, assists, lane }), 'Texto já registrado na fila', GROUP);
+    const before = clone(app.store.match(entry.id));
+    const response = await app.request('/api/message-preview', 'POST', { matchId: entry.id });
+    assert.equal(response.status, 200);
+    assert.equal(response.data.category, sample.category);
+    assert.equal(response.data.performance.kda, sample.kda);
+    assert.equal(response.data.performance.band, sample.band);
+    assert.equal(typeof response.data.performance.label, 'string');
+    assert.equal(typeof response.data.performance.range, 'string');
+    assert.ok(response.data.message.endsWith(sample.phrase));
+    assert.deepEqual(app.store.match(entry.id), before);
+  }
+  assert.deepEqual(await app.config(), draft);
+  assert.deepEqual(app.calls, { history: [], details: [], sends: [], resolve: [] });
 });
 
 test('opening a database from before the editor preserves data and saved message edits survive reopening', t => {

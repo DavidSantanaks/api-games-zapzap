@@ -44,6 +44,46 @@ const VALUE_LENGTH_BUDGETS = {
   farm: 10, lane: 10, gold: 20, gold_bruto: 20, duracao: 22,
   duracao_segundos: 20, data: 25, partida_id: 64,
 };
+// Snapshot of the original pools for the one-time, exact-match migration.
+// Never use these to overwrite phrases authored by the user.
+const LEGACY_PHRASE_POOLS = {
+  feed: [
+    'KKKKKKKKKKKKK FEEDOU DEMAIS',
+    '{{nick}} abriu uma franquia de buffet na {{lane}} KKKKK',
+    '{{deaths}} mortes? O inimigo já salvou teu contato como patrocinador.',
+    'Foi de {{personagem}} ou de motoboy? Só entregou KKKKK',
+    'Esse {{frag}} veio com frete grátis pro time inimigo.',
+    'O respawn já está te chamando de cliente fiel, {{nick}}.',
+    'Jogou {{duracao}} e o destaque foi o caminho da base KKKKK',
+    'A {{lane}} virou rodízio e {{nick}} bancou a conta.',
+  ],
+  carry: [
+    'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
+    '{{frag}} de {{personagem}}? Pode guardar a entrevista, amanhã tem mais.',
+    'Carregou hoje só pra justificar as próximas dez partidas KKKKK',
+    '{{nick}} resolveu ligar o monitor. O grupo agradece.',
+    'Boa partida. Já pode voltar ao desempenho habitual.',
+    '{{kills}} abates e já está se achando no mundial KKKKK',
+    'O {{personagem}} fez a parte dele. Agora explica as outras partidas.',
+    'Com {{gold}} de gold até eu... mentira, eu não fazia isso não KKKKK',
+  ],
+  support: [
+    'CARREGOU NA ASSISTÊNCIA E AINDA VÃO CULPAR O SUP KKKKK',
+    '{{assists}} assistências e nem um obrigado. Vida de sup.',
+    '{{nick}} fez {{frag}} e ainda teve que ser babá do ADC KKKKK',
+    'O time levou os abates, {{personagem}} levou o trabalho.',
+    'Visão de jogo, {{assists}} assistências e zero reconhecimento. Clássico.',
+    'Se assistência pagasse aluguel, {{nick}} comprava o mapa.',
+  ],
+  normal: [
+    'O IMPORTANTE É SE DIVERTIR... FOI DIVERTIDO PRA QUEM? KKKKK',
+    '{{frag}}: participou da partida e do grupo, pelo menos.',
+    'Nem herói, nem vilão. {{nick}} foi o figurante da {{lane}}.',
+    'O {{personagem}} entrou, jogou e foi embora. Cinema.',
+    '{{duracao}} de partida pra render esse print KKKKK',
+    'Essa partida ficou na média. A resenha, infelizmente, não.',
+  ],
+};
 const DEFAULT_CONFIG = {
   templates: [
     {
@@ -84,35 +124,36 @@ const DEFAULT_CONFIG = {
       'A {{lane}} virou rodízio e {{nick}} bancou a conta.',
     ],
     carry: [
-      'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
-      '{{frag}} de {{personagem}}? Pode guardar a entrevista, amanhã tem mais.',
-      'Carregou hoje só pra justificar as próximas dez partidas KKKKK',
-      '{{nick}} resolveu ligar o monitor. O grupo agradece.',
-      'Boa partida. Já pode voltar ao desempenho habitual.',
-      '{{kills}} abates e já está se achando no mundial KKKKK',
-      'O {{personagem}} fez a parte dele. Agora explica as outras partidas.',
-      'Com {{gold}} de gold até eu... mentira, eu não fazia isso não KKKKK',
+      'JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK',
+      '{{frag}} de {{personagem}} foi bonito. A entrevista fica pra outra hora.',
+      'KDA {{kda}}: pode comemorar, {{nick}}, mas sem discurso de campeão.',
+      'Hoje {{nick}} ajudou de verdade. Repete amanhã pra gente acreditar.',
+      'Boa partida! Já pode ganhar um elogio e voltar pra fila.',
+      '{{kills}} abates e uma boa atuação. Calma que ainda não é o mundial KKKKK',
+      'O {{personagem}} trabalhou bem hoje. Crédito onde é devido.',
+      'Mandou bem com {{frag}}. O grupo reconhece, mas não vai fazer estátua.',
     ],
     support: [
-      'CARREGOU NA ASSISTÊNCIA E AINDA VÃO CULPAR O SUP KKKKK',
-      '{{assists}} assistências e nem um obrigado. Vida de sup.',
-      '{{nick}} fez {{frag}} e ainda teve que ser babá do ADC KKKKK',
-      'O time levou os abates, {{personagem}} levou o trabalho.',
-      'Visão de jogo, {{assists}} assistências e zero reconhecimento. Clássico.',
-      'Se assistência pagasse aluguel, {{nick}} comprava o mapa.',
+      'BOM TRABALHO, SUP. ELOGIO LIBERADO, MAS SEM SE ACHAR KKKKK',
+      '{{assists}} assistências e KDA {{kda}}. Pode aceitar o obrigado, {{nick}}.',
+      '{{personagem}} ajudou o time de verdade. Hoje o sup merece crédito.',
+      '{{frag}} na SUP foi uma boa participação. A estátua ainda não vem.',
+      'Mandou bem no apoio, {{nick}}. Amanhã tem que repetir.',
+      'O grupo reconhece esse KDA {{kda}}. Só não vai pedir aumento KKKKK',
     ],
     normal: [
-      'O IMPORTANTE É SE DIVERTIR... FOI DIVERTIDO PRA QUEM? KKKKK',
-      '{{frag}}: participou da partida e do grupo, pelo menos.',
-      'Nem herói, nem vilão. {{nick}} foi o figurante da {{lane}}.',
-      'O {{personagem}} entrou, jogou e foi embora. Cinema.',
-      '{{duracao}} de partida pra render esse print KKKKK',
-      'Essa partida ficou na média. A resenha, infelizmente, não.',
+      'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
+      'KDA {{kda}}: tá ok, {{nick}}. Fez a parte que era sua.',
+      '{{frag}} de {{personagem}}. Serviço cumprido, sem faixa de MVP.',
+      'Participou bem o suficiente. Pode guardar o discurso KKKKK',
+      'Fez o básico na {{lane}}. O grupo agradece sem fazer festa.',
+      'Tá dentro do esperado. Mais uma na conta e segue o jogo.',
     ],
   },
 };
 
 export function getDefaultMessageConfig() { return structuredClone(DEFAULT_CONFIG); }
+export function getLegacyPhrasePools() { return structuredClone(LEGACY_PHRASE_POOLS); }
 
 function record(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -205,16 +246,15 @@ export function validateMessageConfig(config) {
   return { templates, phrases };
 }
 
+export function calculateKda(match = {}) {
+  return (integer(match.kills) + integer(match.assists)) / Math.max(1, integer(match.deaths));
+}
+
 export function classifyPerformance(match) {
-  const kills = integer(match.kills);
-  const deaths = integer(match.deaths);
-  const assists = integer(match.assists);
-  const kda = (kills + assists) / Math.max(1, deaths);
-  const strongAssistContribution = assists >= 15 && kda >= 3;
-  if (deaths >= 5 && !strongAssistContribution && (kills <= 2 || (deaths >= kills * 2 && kda < 2))) return 'feed';
-  if (match.lane === 'SUP' && assists >= 10 && kda >= 3) return 'support';
-  if (kda >= 4 || (kills >= 10 && kda >= 2)) return 'carry';
-  return 'normal';
+  const kda = calculateKda(match);
+  if (kda < 1) return 'feed';
+  if (kda < 2.5) return 'normal';
+  return match.lane === 'SUP' ? 'support' : 'carry';
 }
 
 function selectIndex(seed, size) {
@@ -239,7 +279,7 @@ function matchValues(match) {
     jogo: 'LOL', modo: gameModeLabel(match), resultado: match.win ? 'VITÓRIA' : 'DERROTA', resultado_emoji: match.win ? '🟢' : '🔴',
     player, nick: separator < 0 ? player : player.slice(0, separator), tag: separator < 0 ? '' : player.slice(separator + 1),
     frag: `${kills}/${deaths}/${assists}`, kills: String(kills), deaths: String(deaths), assists: String(assists),
-    kda: ((kills + assists) / Math.max(1, deaths)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    kda: calculateKda(match).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     personagem: String(match.champion || 'Desconhecido'), farm: String(integer(match.cs)), lane: String(match.lane || 'N/A'),
     gold: integer(match.gold).toLocaleString('pt-BR'), gold_bruto: String(integer(match.gold)),
     duracao: `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`,
@@ -272,10 +312,10 @@ export function formatMessage(match, { config, phrase, templateId, phraseIndex }
 
 export function createPreview(scenario = 'feed', options = {}) {
   const scenarios = {
-    feed: { champion: 'Yasuo', kills: 1, deaths: 5, assists: 9, cs: 124, gold: 10_000, lane: 'MID', win: false },
+    feed: { champion: 'Yasuo', kills: 1, deaths: 8, assists: 3, cs: 124, gold: 10_000, lane: 'MID', win: false },
     carry: { champion: 'Jinx', kills: 15, deaths: 2, assists: 8, cs: 242, gold: 18_500, lane: 'ADC', win: true },
     support: { champion: 'Lulu', kills: 1, deaths: 3, assists: 24, cs: 32, gold: 9_850, lane: 'SUP', win: true },
-    normal: { champion: 'Garen', kills: 4, deaths: 4, assists: 6, cs: 175, gold: 12_400, lane: 'TOP', win: false },
+    normal: { champion: 'Yasuo', kills: 1, deaths: 5, assists: 9, cs: 124, gold: 10_000, lane: 'MID', win: false },
   };
   if (!Object.hasOwn(scenarios, scenario)) throw new MessageConfigError('Escolha uma prévia: feed, carry, support ou normal.');
   const match = {

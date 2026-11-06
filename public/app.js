@@ -267,11 +267,19 @@
       button.setAttribute('aria-pressed', String(active));
     });
     $('preview-message').textContent = 'Gerando exemplo…';
+    $('preview-kda-summary').textContent = 'Calculando o KDA do exemplo…';
     try {
       const data = await api('/api/preview', 'POST', { scenario });
-      if (selectedScenario === scenario) $('preview-message').textContent = data.message;
+      if (selectedScenario === scenario) {
+        $('preview-message').textContent = data.message;
+        const label = data.performance?.label || ({ feed: 'Zoeira', normal: 'Obrigação', carry: 'Elogio moderado', support: 'Elogio ao suporte' })[data.category] || '';
+        $('preview-kda-summary').textContent = `KDA ${data.values?.kda || '—'} · ${label}`;
+      }
     } catch (error) {
-      if (selectedScenario === scenario) $('preview-message').textContent = 'Não foi possível carregar a prévia. Escolha um exemplo para tentar novamente.';
+      if (selectedScenario === scenario) {
+        $('preview-message').textContent = 'Não foi possível carregar a prévia. Escolha um exemplo para tentar novamente.';
+        $('preview-kda-summary').textContent = 'Prévia indisponível';
+      }
       toast(error.message, true);
     }
   }

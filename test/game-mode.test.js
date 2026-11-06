@@ -37,7 +37,7 @@ test('mode is available in message templates and phrase variables for old and ne
   const { match } = createPreview('feed');
   const result = formatMessage({ ...match, queueId: 450, gameMode: undefined, mode: undefined }, { config });
   assert.equal(result.values.modo, 'ARAM');
-  assert.equal(result.message, 'Modo: ARAM\nSeuAmigo fez 1/5/9 na ARAM');
+  assert.equal(result.message, 'Modo: ARAM\nSeuAmigo fez 1/8/3 na ARAM');
   assert.ok(MESSAGE_VARIABLES.some(variable => variable.key === 'modo' && variable.label === 'Modo de jogo'));
   for (const preset of getDefaultMessageConfig().templates) assert.ok(preset.text.includes('\nModo: {{modo}}\n'));
 });

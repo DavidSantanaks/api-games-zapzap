@@ -36,6 +36,25 @@
   const clone = value => JSON.parse(JSON.stringify(value));
   const selected = () => draft?.templates.find(template => template.id === selectedId);
   const categoryLabel = key => categories.find(item => item.key === key)?.label || key;
+  const bandLabels = { feed: 'Zoeira', normal: 'Não fez mais que a obrigação', carry: 'Elogio moderado' };
+  const bandRanges = { feed: 'KDA < 1', normal: '1 ≤ KDA < 2,5', carry: 'KDA ≥ 2,5' };
+  function showPerformance(result) {
+    const band = result.performance?.band || (result.category === 'support' ? 'carry' : result.category);
+    const kda = result.values?.kda || (Number.isFinite(result.performance?.kda)
+      ? result.performance.kda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—');
+    $('message-preview-kda').textContent = kda;
+    $('message-preview-band').textContent = result.performance?.label || bandLabels[band] || 'Desempenho da partida';
+    $('message-preview-range').textContent = result.performance?.range || bandRanges[band] || '';
+    $('message-preview-performance').dataset.band = band;
+    for (const item of document.querySelectorAll('[data-kda-band]')) item.classList.toggle('active', item.dataset.kdaBand === band);
+  }
+  function clearPerformance() {
+    $('message-preview-kda').textContent = '—';
+    $('message-preview-band').textContent = 'Aguardando uma prévia válida';
+    $('message-preview-range').textContent = '';
+    delete $('message-preview-performance').dataset.band;
+    for (const item of document.querySelectorAll('[data-kda-band]')) item.classList.remove('active');
+  }
 
   function node(tag, className, text) {
     const element = document.createElement(tag);
@@ -212,6 +231,9 @@
   }
   function renderPhrases() {
     const phrases = draft.phrases[phraseCategory] || [];
+    const category = categories.find(item => item.key === phraseCategory);
+    const band = category?.band || (phraseCategory === 'support' ? 'carry' : phraseCategory);
+    $('message-category-range').textContent = `${category?.range || bandRanges[band] || ''}${phraseCategory === 'support' ? ' · Frases positivas próprias para quem jogou de suporte.' : ' · Frases usadas automaticamente nesta faixa.'}`;
     $('message-phrases-text').value = phrases.join('\n');
     $('message-phrase-count').textContent = `${phrases.length} ${phrases.length === 1 ? 'frase' : 'frases'}`;
     cursors.set('message-phrases-text', { start: $('message-phrases-text').value.length, end: $('message-phrases-text').value.length });
@@ -268,6 +290,7 @@
       $('message-studio-preview').textContent = result.message;
       $('message-preview-error').hidden = true;
       previewCategory = result.category;
+      showPerformance(result);
       lastPhraseIndex = result.phraseIndex ?? 0;
       $('message-preview-category').textContent = categoryLabel(result.category);
       $('message-preview-mode').textContent = result.values?.modo || result.match?.mode || 'Modo não disponível';
@@ -283,6 +306,7 @@
     } catch (error) {
       if (error.name === 'AbortError' || version !== previewVersion) return;
       $('message-preview-error').textContent = error.message || 'Não foi possível gerar a prévia. Tente novamente.';
+      clearPerformance();
       $('next-message-phrase').disabled = true;
       $('message-preview-error').hidden = false;
       $('message-studio-preview').textContent = 'Ajuste o rascunho para ver a mensagem preenchida.';

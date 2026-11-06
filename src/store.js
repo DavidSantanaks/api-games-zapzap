@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { getDefaultMessageConfig, validateMessageConfig } from './message.js';
+import { getDefaultMessageConfig, getLegacyPhrasePools, validateMessageConfig } from './message.js';
 
 export class Store {
   constructor(filename, { pollIntervalSeconds = 120 } = {}) {
@@ -44,6 +44,27 @@ export class Store {
       });
       if (updated) this.updateMessageConfig({ ...current, templates });
       this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('message-presets-mode-v1');
+    }
+    if (!this.db.prepare('SELECT 1 FROM app_migrations WHERE name=?').get('message-kda-bands-v1')) {
+      const current = this.messageConfig();
+      const legacy = getLegacyPhrasePools();
+      const defaults = getDefaultMessageConfig();
+      const phrases = { ...current.phrases };
+      let updated = false;
+      for (const category of Object.keys(defaults.phrases)) {
+        if (JSON.stringify(phrases[category]) === JSON.stringify(legacy[category])) {
+          // A longer default phrase must not invalidate an authored template near the render limit.
+          try { validateMessageConfig({ ...current, phrases: { ...phrases, [category]: defaults.phrases[category] } }); }
+          catch (error) {
+            if (error.name === 'MessageConfigError') continue;
+            throw error;
+          }
+          phrases[category] = defaults.phrases[category];
+          updated = true;
+        }
+      }
+      if (updated) this.updateMessageConfig({ ...current, phrases });
+      this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('message-kda-bands-v1');
     }
   }
 

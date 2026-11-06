@@ -159,11 +159,15 @@ test('optional Basic authentication protects static content and API', async t =>
 
 test('preview produces example text without persisting, checking Riot, or sending', async t => {
   const { request, store, calls } = await fixture(t, { configured: false });
-  for (const scenario of ['feed', 'carry', 'support']) {
+  const expectedKda = { feed: 0.5, normal: 2, carry: 11.5, support: 25 / 3 };
+  for (const scenario of ['feed', 'normal', 'carry', 'support']) {
     const result = await request('/api/preview', { method: 'POST', body: { scenario } });
     assert.equal(result.status, 200);
     assert.match(result.data.message, /Jogo: LOL/);
     assert.equal(result.data.match.id, `preview-${scenario}`);
+    assert.equal(result.data.category, scenario);
+    assert.equal(result.data.performance.kda, expectedKda[scenario]);
+    assert.equal(result.data.performance.band, scenario === 'support' ? 'carry' : scenario);
   }
   assert.equal((await request('/api/preview', { method: 'POST', body: { scenario: '__proto__' } })).status, 400);
   assert.equal(store.matches().length, 0);
