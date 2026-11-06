@@ -57,9 +57,9 @@ Lista criada em **06/11/2026**, a pedido do usuário. Os itens abaixo são suges
 
 ### M-009 — Escolher e integrar o próximo jogo
 
-- **Decisão pendente do usuário:** apenas LoL está implementado.
-- Candidatos pesquisados: Dota 2/OpenDota, CS2 na FACEIT e Deadlock por API comunitária. CS2 Premier, R6 e EA Sports FC exigem avaliação própria de acesso e cobertura.
-- **Antes de implementar:** revalidar a API, os modos atendidos, limites, credenciais e dados disponíveis. Para CS2, distinguir FACEIT de Premier/Competitivo da Valve; para futebol, confirmar a edição e o modo.
+- **Entrega parcial concluída (06/11/2026):** **Counter-Strike 2 (Premier e Competitivo)** integrado a pedido do usuário (`src/cs2.js`, `src/cs2-message.js`, `src/games.js`), usando Steam Web API (`GetNextMatchSharingCode`) + Leetify, migração aditiva no SQLite e abas independentes na interface.
+- Outros candidatos pesquisados continuam dependentes de escolha do usuário: Dota 2/OpenDota, CS2 na FACEIT e Deadlock por API comunitária. R6 e EA Sports FC exigem avaliação própria de acesso e cobertura.
+- **Antes de implementar outro jogo:** revalidar a API, os modos atendidos, limites, credenciais e dados disponíveis; para futebol, confirmar a edição e o modo.
 - **Aceite:** adaptador separado, dados normalizados, templates compatíveis, deduplicação e testes offline, mantendo o projeto leve.
 
 ## Como manter esta lista
