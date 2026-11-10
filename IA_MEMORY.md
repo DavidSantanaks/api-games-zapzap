@@ -1,10 +1,10 @@
 # Memória do projeto — GG Report
 
-Atualizada em **09/11/2026**. Leia este arquivo e o [README](README.md) antes de continuar o desenvolvimento. Registre decisões e entregas novas aqui, sem incluir credenciais ou dados da instalação do usuário.
+Atualizada em **10/11/2026**. Leia este arquivo e o [README](README.md) antes de continuar o desenvolvimento. Registre decisões e entregas novas aqui, sem incluir credenciais ou dados da instalação do usuário.
 
 ## Objetivo e preferências
 
-- Acompanhar partidas de jogos competitivos (**League of Legends** e **Counter-Strike 2**) e publicar um resumo com zoeira em um grupo do WhatsApp.
+- Acompanhar partidas de jogos competitivos (**League of Legends**, **Counter-Strike 2** e **Rainbow Six Siege**) e publicar um resumo com zoeira em um grupo do WhatsApp.
 - Manter o projeto leve, simples, com interface e execução em Docker; **sem Java**.
 - Stack atual: Node.js 24, Express, SQLite nativo (`node:sqlite`) e HTML/CSS/JavaScript sem build ou CDN, sem novas dependências de runtime.
 - Um único container, sem Chromium, Redis, banco separado ou serviço de IA. As frases usam regras locais.
@@ -15,7 +15,7 @@ Atualizada em **09/11/2026**. Leia este arquivo e o [README](README.md) antes de
 
 ### Infraestrutura compartilhada e League of Legends
 
-- Duas abas independentes na interface (**League of Legends** e **Counter-Strike 2**), cada uma com seus jogadores, contadores, histórico, prévias e editor de mensagens, compartilhando WhatsApp, grupo selecionado, intervalo, monitor e fila persistente.
+- Duas abas independentes na interface (**League of Legends**, **Counter-Strike 2** e **Rainbow Six Siege**), cada uma com seus jogadores, contadores, histórico, prévias e editor de mensagens, compartilhando WhatsApp, grupo selecionado, intervalo, monitor e fila persistente.
 - Integração com **League of Legends**: Riot ID → PUUID → histórico e detalhes da Match-v5.
 - Cadastro, pausa e remoção de jogadores; região Américas para o servidor brasileiro.
 - Monitor periódico configurável: padrão de 120 segundos, mínimo de 30; começa pausado na instalação nova.
@@ -41,6 +41,24 @@ Atualizada em **09/11/2026**. Leia este arquivo e o [README](README.md) antes de
 - **Proteção contra bloqueio `503` da Valve e demos pendentes:** respostas `403`/`412` em `GetNextMatchSharingCode` ficam em cache (`invalidShareAuth`) até os códigos mudarem. Quando uma partida recém-detectada na Steam ainda não teve a demo `.dem` indexada (`404`/`5xx` no Leetify), o monitor mantém o cursor e aguarda por até 45 minutos (`pendingGraceMs`) antes de avançar, evitando perder a partida ou travar a fila indefinidamente se a demo expirar na Valve.
 - Atribuição exigida pelo provedor incluída na aba e no diálogo de detalhes do CS2 (`Data Provided by Leetify` + link `View on Leetify` quando há `leetifyMatchId`).
 - Segredos protegidos: `STEAM_API_KEY`, `LEETIFY_API_KEY`, `authCode` e `knownCode` nunca vão para `/api/state` (que expõe apenas `hasShareAuth`) e estão na lista `redact` do Pino em `src/server.js`.
+
+### Rainbow Six Siege (10/11/2026)
+
+- Fonte: API da **stats.cc** (`https://api.stats.cc/siege`, OpenAPI v3.27.0), chave `STATS_CC_API_KEY` no header `x-api-key`, escopos `profiles` + `matches`. A stats.cc liberou o acesso gratuito para o grupo privado com estas condições: **crédito "Data by Stats.cc" nos resumos**, **respeitar perfis ocultos**, **chave só no servidor**, **sem scraping/backfill** (só partidas recentes), seguir os cabeçalhos de limite.
+- Decisões do usuário: playlists `ranked` (Ranqueada), `unranked` (Padrão) e `legend-division` (Legend Division); elogio só com **KDA ≥ 4 e vitória** (`R6_PRAISE_MIN_KDA`), frases ácidas; **só polling**, sem `POST /update`; crédito como **rodapé fixo automático** (`R6_CREDIT = '📊 Data by Stats.cc'`) em toda mensagem do R6 e no resumo semanal do R6, fora do editor.
+- `src/r6.js`: `R6Client` (cadastro por plataforma + nick → `profile_id` UUID; `unknown_profile` tenta de novo uma vez após 4 s; `hidden_profile` com mensagem clara; `403 missing_scope`; `429`/`503` com `retryAfterMs`; `RateLimit-Remaining: 0` bloqueia até `RateLimit-Reset`). `/v2/config` (sem chave) com cache de 12 h para plataformas, mapas e ranks; sem config, slugs viram nomes legíveis. `newMatches` usa `after=<último id>` e pagina só para frente (nunca `before`). Item malformado é pulado sem travar os outros.
+- Normalização: resultado `win`/`loss`/`draw`, com `outcome` original (`abandon`, `surrender`, `forfeit` contam como derrota); cancelamentos (`*-cancel`, `end_reason: canceled`) e outras playlists são ignorados. Placar pelo índice `team` em `scores`. HS% = headshots ÷ kills. Rank/pontos só em ranqueadas (`ranked_session`/`legend_session`); ausente → `N/A`.
+- Monitor: `checkR6Player` avança o cursor partida a partida; `hidden_profile` durante o polling **pausa o player** (segura envios pendentes). Limite da stats.cc só pula os players de R6 no ciclo.
+- Store: `identity = r6:<profile_id>` (sem mudar schema); config em `game_message_config` (`INSERT OR IGNORE`). Motor comum ganhou a opção `footer` em `createMessageEngine`.
+- Rotas: `GET /api/r6/platforms`; `POST /api/players` com `game: 'r6', platform, username`; `/api/state` expõe `games.r6` e `r6Configured`. Interface: 3º botão (badge **R6**), select de plataforma vindo do config, aviso de chave ausente e crédito "Data by Stats.cc" no rodapé.
+
+Variáveis do R6:
+
+```text
+jogo, modo, resultado, resultado_emoji, player, nick, plataforma, mapa, placar,
+frag, kills, deaths, assists, kda, rounds, hs, aberturas, clutches, rank, pontos,
+data, partida_id, zoeira
+```
 
 ### Resumo semanal (09/11/2026)
 
@@ -114,14 +132,16 @@ No LoL, `{{modo}}` usa primeiro `queueId`, diferenciando Ranqueada Solo/Duo, Fle
 | --- | --- |
 | `src/server.js` | Inicialização, ambiente, redaction de segredos, sessão existente e encerramento |
 | `src/app.js` | Rotas HTTP multi-jogo, validação, autenticação opcional e prévias |
-| `src/games.js` | Registro dos jogos suportados (`lol` e `cs2`) e campos de prévia |
+| `src/games.js` | Registro dos jogos suportados (`lol`, `cs2` e `r6`) e campos de prévia |
 | `src/http.js` | Utilitários compartilhados (`nonempty`, `number`, `retryDelay`) |
 | `src/riot.js` | API Riot, autenticação, limites e normalização (LoL) |
 | `src/game-mode.js` | Rótulos de filas/modos do LoL com fallback para registros antigos |
 | `src/cs2.js` | Steam Web API (`GetPlayerSummaries`, `GetNextMatchSharingCode`), decodificador base57 `CSGO-...`, Leetify e normalização (CS2) |
 | `src/message.js` | Motor comum `createMessageEngine` + variáveis, modelos, frases e classificação do LoL |
 | `src/cs2-message.js` | Variáveis, modelos, frases, faixas de KDA, `mapLabel` e prévias do CS2 |
-| `src/monitor.js` | Polling multi-jogo (`lol` e `cs2`), espera de demo `.dem` e envio da fila |
+| `src/r6.js` | Cliente da stats.cc (perfil, histórico com `after`, config em cache, limites) e normalização (R6) |
+| `src/r6-message.js` | Variáveis, modelos, frases, crédito `R6_CREDIT` e prévias do R6 |
+| `src/monitor.js` | Polling multi-jogo (`lol`, `cs2` e `r6`), espera de demo `.dem` e envio da fila |
 | `src/store.js` | SQLite, configurações, migrações aditivas, modelos por jogo, jogadores e fila |
 | `src/whatsapp.js` | Baileys, QR, grupos, reconexão e sessão |
 | `src/weekly.js` | Janela semanal no fuso de São Paulo, faixas, ranking e mensagem do resumo semanal |
@@ -136,7 +156,7 @@ No LoL, `{{modo}}` usa primeiro `queueId`, diferenciando Ranqueada Solo/Duo, Fle
 
 O volume `gg-data` guarda banco, configurações e autenticação do WhatsApp. Não apagar nem substituir os dados para atualizar a aplicação.
 
-**`docker compose restart` não recarrega o `.env`.** Aplicar alterações de chaves (`RIOT_API_KEY`, `STEAM_API_KEY`, `LEETIFY_API_KEY`, `APP_PASSWORD`) com:
+**`docker compose restart` não recarrega o `.env`.** Aplicar alterações de chaves (`RIOT_API_KEY`, `STEAM_API_KEY`, `LEETIFY_API_KEY`, `STATS_CC_API_KEY`, `APP_PASSWORD`) com:
 
 ```powershell
 docker compose up -d --force-recreate
@@ -152,6 +172,8 @@ Credenciais ficam no ambiente (ou protegidas no SQLite no caso de `authCode`/`kn
 
 ## Validação conhecida
 
+- Rainbow Six Siege (10/11/2026): **112 testes passando** (13 novos em `test/r6*.test.js` com `fetch` simulado: perfil, histórico, 404 `unknown_profile`/`hidden_profile`, 403 `missing_scope`, 401, 429/`Retry-After`, `RateLimit-Remaining`, 503, empate/abandono, playlists ignoradas, deduplicação após reinício, isolamento LoL × R6 e migração). `npm run check` passou; aba R6 verificada no navegador (desktop 1400px e celular 390px sem rolagem horizontal) numa instância local isolada sem chave.
+
 - Frases por partida (10/11/2026): 99 testes passando, incluindo `test/phrases-migration.test.js`.
 - Resumo semanal (09/11/2026): **99 testes passando** (9 novos em `test/weekly.test.js`: janela e fuso, faixas e raridade do elogio, empates, ranking, validação, envio único por semana, tolerância de 24h, reenvio e rotas). `npm run check` passou; seção verificada em Chrome headless (desktop 1400px e celular 390px, sem rolagem horizontal).
 
@@ -162,7 +184,7 @@ Credenciais ficam no ambiente (ou protegidas no SQLite no caso de `authCode`/`kn
 
 ## Expansão para outros jogos e pendências
 
-**League of Legends** e **Counter-Strike 2 (Premier e Competitivo)** estão implementados. Outros candidatos anteriormente pesquisados (Dota 2/OpenDota, Deadlock, R6, FC) seguem apenas como referência e dependem de pedido explícito do usuário e revalidação de API.
+**League of Legends**, **Counter-Strike 2 (Premier e Competitivo)** e **Rainbow Six Siege (stats.cc)** estão implementados. Outros candidatos anteriormente pesquisados (Dota 2/OpenDota, Deadlock, FC) seguem apenas como referência e dependem de pedido explícito do usuário e revalidação de API.
 
 Consulte [MELHORIAS.md](MELHORIAS.md) antes de definir novas prioridades. Os itens pendentes (como M-001 sobre jogadores pausados no limite de 20 entregas e M-002 sobre desconexão durante lote de envio) não devem ser implementados sem solicitação explícita.
 

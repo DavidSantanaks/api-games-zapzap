@@ -58,7 +58,8 @@ Lista criada em **06/11/2026**, a pedido do usuário. Os itens abaixo são suges
 ### M-009 — Escolher e integrar o próximo jogo
 
 - **Entrega parcial concluída (06/11/2026):** **Counter-Strike 2 (Premier e Competitivo)** integrado a pedido do usuário (`src/cs2.js`, `src/cs2-message.js`, `src/games.js`), usando Steam Web API (`GetNextMatchSharingCode`) + Leetify, migração aditiva no SQLite e abas independentes na interface.
-- Outros candidatos pesquisados continuam dependentes de escolha do usuário: Dota 2/OpenDota, CS2 na FACEIT e Deadlock por API comunitária. R6 e EA Sports FC exigem avaliação própria de acesso e cobertura.
+- **Entrega concluída (10/11/2026):** **Rainbow Six Siege** integrado a pedido do usuário pela API da stats.cc (`src/r6.js`, `src/r6-message.js`): Ranqueada, Padrão e Legend Division, elogio com KDA ≥ 4 e vitória, só polling e crédito fixo "Data by Stats.cc".
+- Outros candidatos pesquisados continuam dependentes de escolha do usuário: Dota 2/OpenDota, CS2 na FACEIT e Deadlock por API comunitária. EA Sports FC exige avaliação própria de acesso e cobertura.
 - **Antes de implementar outro jogo:** revalidar a API, os modos atendidos, limites, credenciais e dados disponíveis; para futebol, confirmar a edição e o modo.
 - **Aceite:** adaptador separado, dados normalizados, templates compatíveis, deduplicação e testes offline, mantendo o projeto leve.
 
@@ -66,8 +67,18 @@ Lista criada em **06/11/2026**, a pedido do usuário. Os itens abaixo são suges
 
 ### M-010 — Frases do resumo semanal por jogo
 
-- **Situação:** o modelo e as frases do resumo semanal são compartilhados entre LoL e CS2 (`weekly_config`).
+- **Situação:** o modelo e as frases do resumo semanal são compartilhados entre LoL, CS2 e R6 (`weekly_config`).
 - **Proposta:** permitir frases próprias por jogo, se o usuário quiser piadas específicas (PDL, Major etc.).
+
+### M-011 — Detecção mais rápida no R6 com `POST /update`
+
+- **Situação:** o R6 só faz polling do histórico; a stats.cc atualiza as partidas até 5 minutos após o fim.
+- **Proposta:** se a demora incomodar, pedir `POST /v2/profiles/{id}/update` (escopo `profiles:update`, intervalo mínimo de 15 minutos, `409 profile_update_too_soon`). Decidido em 10/11/2026 não usar por enquanto.
+
+### M-012 — Partida Rápida e eventos no R6
+
+- **Situação:** só Ranqueada, Padrão e Legend Division geram mensagem (`R6_PLAYLISTS` em `src/r6.js`).
+- **Proposta:** tornar as playlists configuráveis pela interface, se o grupo quiser zoar `quick-match` ou eventos.
 
 ## Como manter esta lista
 
