@@ -26,6 +26,10 @@
           <span class="game-tab-badge">CS2</span>
           <span class="game-tab-copy"><strong>Counter-Strike 2</strong><small>Premier e Competitivo</small></span>
         </button>
+        <button class="game-tab" data-game-tab="r6" type="button" aria-pressed="false">
+          <span class="game-tab-badge">R6</span>
+          <span class="game-tab-copy"><strong>Rainbow Six Siege</strong><small>Ranqueada, Padrão e Legend</small></span>
+        </button>
       </nav>
 
       <nav class="view-nav" aria-label="Seções">
@@ -47,6 +51,7 @@
       <div id="connection-alert" class="connection-alert" role="status" hidden>Não foi possível atualizar o painel. Tentando reconectar…</div>
       <div id="riot-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta a chave da Riot.</strong> Preencha <code>RIOT_API_KEY</code> no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. Você já pode experimentar as prévias.</p><a href="https://developer.riotgames.com/" target="_blank" rel="noreferrer">Obter chave ↗</a></div>
       <div id="cs2-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta configurar a chave do CS2.</strong> Preencha <code>STEAM_API_KEY</code> (e opcionalmente <code>LEETIFY_API_KEY</code>) no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. As prévias já funcionam.</p><a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer">Chave Steam ↗</a></div>
+      <div id="r6-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta a chave da stats.cc.</strong> Preencha <code>STATS_CC_API_KEY</code> no arquivo <code>.env</code> (escopos <code>profiles</code> e <code>matches</code>). No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. As prévias já funcionam.</p><a href="https://api.stats.cc/siege/docs" target="_blank" rel="noreferrer">API da stats.cc ↗</a></div>
 
       <div class="view" data-view="painel">
       <section class="page-intro" aria-labelledby="page-title">
@@ -117,6 +122,17 @@
                 <div class="player-form-bottom cs2-form-bottom">
                   <span class="cs2-mode-pill">Somente Premier e Competitivo · ignora FACEIT</span>
                   <button id="add-cs2-player" class="button button-lime" type="submit"><span aria-hidden="true">+</span> Adicionar player</button>
+                </div>
+              </div>
+
+              <div id="r6-player-fields" class="cs2-player-fields" hidden>
+                <div class="cs2-id-fields">
+                  <div class="field r6-platform-field"><label for="r6-platform">Plataforma</label><select id="r6-platform" name="r6Platform"><option value="pc">PC</option><option value="playstation">PlayStation</option><option value="xbox">Xbox</option></select></div>
+                  <div class="field cs2-alias-field"><label for="r6-username">Nick no Siege</label><input id="r6-username" name="r6Username" placeholder="Nick da conta Ubisoft" maxlength="40" autocomplete="off" spellcheck="false"></div>
+                </div>
+                <div class="player-form-bottom cs2-form-bottom">
+                  <span class="cs2-mode-pill">Ranqueada, Padrão e Legend Division · perfis ocultos não são acompanhados</span>
+                  <button id="add-r6-player" class="button button-lime" type="submit"><span aria-hidden="true">+</span> Adicionar player</button>
                 </div>
               </div>
             </form>
@@ -236,7 +252,7 @@
       </section>
       </div>
 
-      <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span><a id="footer-leetify" class="text-link footer-credit" href="https://leetify.com/" target="_blank" rel="noreferrer">Data Provided by Leetify ↗</a></div><p>GG Report is not endorsed by Riot Games, Valve Corporation, or Leetify. Riot Games, League of Legends, Counter-Strike, Steam, and associated properties are trademarks or registered trademarks of their respective owners.</p></footer>
+      <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span><a id="footer-leetify" class="text-link footer-credit" href="https://leetify.com/" target="_blank" rel="noreferrer">Data Provided by Leetify ↗</a><a id="footer-statscc" class="text-link footer-credit footer-credit-next" href="https://stats.cc/" target="_blank" rel="noreferrer">Data by Stats.cc ↗</a></div><p>GG Report is not endorsed by Riot Games, Valve Corporation, Ubisoft, Leetify, or Stats.cc. Riot Games, League of Legends, Counter-Strike, Steam, Rainbow Six Siege, and associated properties are trademarks or registered trademarks of their respective owners.</p></footer>
     </main>
 
   </div>

@@ -155,12 +155,14 @@ body.message-studio-open{overflow:hidden}
 .result-stripe.draw{background:#d7ba63}
 .match-result.draw{color:#e6cd7d}
 .footer-credit{margin-left:auto;font-size:11px;color:#b39ecc;text-decoration:underline}
+.footer-credit-next{margin-left:12px}
+.r6-platform-field{flex:0 0 180px}
 .dialog-external-link{margin:0 0 14px;font-size:12.5px}
 #cs2-auth-dialog{border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);padding:22px;width:min(460px,calc(100vw - 32px))}
 #cs2-auth-dialog::backdrop{background:#08070acc}
 .cs2-dialog-form{display:flex;flex-direction:column;gap:13px}
 .cs2-dialog-help{margin:0;font-size:12.5px;color:#a69ab4;line-height:1.6}
-@media(max-width:760px){.cs2-id-fields{flex-direction:column;align-items:stretch}.cs2-alias-field{flex:1}.cs2-auth-grid{grid-template-columns:minmax(0,1fr)}.cs2-form-bottom{flex-direction:column;align-items:stretch;gap:10px}}
+@media(max-width:760px){.cs2-id-fields{flex-direction:column;align-items:stretch}.r6-platform-field{flex:1}.cs2-alias-field{flex:1}.cs2-auth-grid{grid-template-columns:minmax(0,1fr)}.cs2-form-bottom{flex-direction:column;align-items:stretch;gap:10px}}
 @media(max-width:590px){.game-tabs{grid-template-columns:minmax(0,1fr);gap:8px;margin-top:16px}.game-tab{padding:11px 14px;min-height:50px}.game-tab-copy strong{font-size:13.5px}.game-tab-copy small{font-size:11px}.footer-credit{margin-left:0}}
 @media(prefers-reduced-motion:reduce){.studio-variable-chip,.studio-code-input{transition:none}}
 .weekly-panel{margin-top:28px;scroll-margin-top:24px}.weekly-header{align-items:flex-start}.weekly-header-actions{display:flex;align-items:center;gap:14px}.weekly-fields{border:0;margin:0;padding:0 24px 24px;min-width:0}.weekly-fields:disabled{opacity:.6}
@@ -255,7 +257,7 @@ h1>span{color:var(--accent)}
 @media(max-width:1180px){
   .app-shell{grid-template-columns:minmax(0,1fr)}
   .sidebar{position:sticky;top:0;height:auto;overflow:visible;flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:12px 24px;border-right:0;border-bottom:1px solid var(--border);background:#15111cf0;backdrop-filter:blur(10px)}
-  .sidebar .game-tabs{grid-template-columns:repeat(2,auto);margin-left:auto;gap:6px}
+  .sidebar .game-tabs{grid-template-columns:repeat(3,auto);margin-left:auto;gap:6px}
   .sidebar .game-tab{min-height:40px;padding:6px 10px 6px 6px}
   .sidebar .game-tab-copy small{display:none}
   .view-nav{order:3;width:100%;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 -6px}

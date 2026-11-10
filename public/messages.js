@@ -34,6 +34,7 @@
   const categoryLabel = key => session()?.categories.find(item => item.key === key)?.label || key;
   const bandLabels = { feed: 'Zoeira', normal: 'Não fez mais que a obrigação', carry: 'Elogio moderado' };
   const praiseKda = () => (currentGame === 'cs2' ? '3' : '4');
+  const gameTag = game => ({ lol: 'LOL', cs2: 'CS2', r6: 'R6' })[game] || 'LOL';
   const bandRangesFor = () => ({ feed: 'KDA < 1', normal: 'KDA ≥ 1 sem elogio', carry: `KDA ≥ ${praiseKda()} e vitória` });
 
   function showPerformance(result) {
@@ -108,16 +109,18 @@
   function renderGameChrome() {
     const isCs2 = currentGame === 'cs2';
     const eyebrow = $('studio-eyebrow');
-    if (eyebrow) eyebrow.textContent = isCs2 ? 'VOCÊ ESCREVE A RESENHA · CS2' : 'VOCÊ ESCREVE A RESENHA · LOL';
+    if (eyebrow) eyebrow.textContent = `VOCÊ ESCREVE A RESENHA · ${gameTag(currentGame)}`;
     const note = $('studio-kda-note');
     if (note) {
-      note.textContent = isCs2
-        ? 'Elogio só com KDA 3 ou mais e vitória; derrota ou empate fica em obrigação. As faixas usam o cálculo exato antes de arredondar.'
-        : 'Elogio só com KDA 4 ou mais e vitória; derrota fica em obrigação. As assistências também contam para o suporte.';
+      note.textContent = currentGame === 'r6'
+        ? 'Elogio só com KDA 4 ou mais e vitória; derrota, empate ou abandono fica em obrigação. O crédito “Data by Stats.cc” é acrescentado ao fim de toda mensagem.'
+        : isCs2
+          ? 'Elogio só com KDA 3 ou mais e vitória; derrota ou empate fica em obrigação. As faixas usam o cálculo exato antes de arredondar.'
+          : 'Elogio só com KDA 4 ou mais e vitória; derrota fica em obrigação. As assistências também contam para o suporte.';
     }
     const carryBand = $('kda-band-carry');
     if (carryBand) carryBand.textContent = `${praiseKda()} ou mais, com vitória`;
-    $('message-template-help').innerHTML = isCs2
+    $('message-template-help').innerHTML = isCs2 || currentGame === 'r6'
       ? 'Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Mapa: {{mapa}} ({{placar}})</code>. Use <code>{{zoeira}}</code> para incluir um comentário.'
       : 'Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Modo: {{modo}}</code>. Use <code>{{zoeira}}</code> para incluir um comentário.';
   }
@@ -398,7 +401,7 @@
       const matches = (state.matches || []).filter(match => (match.game || 'lol') === targetGame);
       for (const match of matches) {
         const mode = match.mode ? ` · ${match.mode}` : '';
-        const subject = targetGame === 'cs2'
+        const subject = targetGame === 'cs2' || targetGame === 'r6'
           ? `${match.mapLabel || match.map || 'Mapa'}${match.score ? ' (' + match.score + ')' : ''}`
           : match.champion;
         const option = node('option', '', `${match.playerName}${mode} · ${subject} · ${match.kills}/${match.deaths}/${match.assists}`);
@@ -458,7 +461,7 @@
     }
   }
   function switchGame(nextGame) {
-    if (nextGame !== 'lol' && nextGame !== 'cs2') return;
+    if (nextGame !== 'lol' && nextGame !== 'cs2' && nextGame !== 'r6') return;
     currentGame = nextGame;
     clearTimeout(previewTimer);
     previewController?.abort();
@@ -468,6 +471,7 @@
   }
   function newId() { return 'modelo-' + (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`); }
   function starterTemplateText() {
+    if (currentGame === 'r6') return '🎮 {{jogo}} · {{modo}}\n{{resultado_emoji}} {{resultado}} em {{mapa}} ({{placar}})\n{{player}} terminou {{frag}} · HS {{hs}} · KDA {{kda}}\n\n{{zoeira}}';
     return currentGame === 'cs2'
       ? '🎮 {{jogo}} · {{modo}}\n{{resultado_emoji}} {{resultado}} em {{mapa}} ({{placar}})\n{{player}} terminou {{frag}} · ADR {{adr}} · KDA {{kda}}\n\n{{zoeira}}'
       : '🎮 {{jogo}} · {{modo}}\n{{resultado_emoji}} {{resultado}}\n{{player}} terminou {{frag}} de {{personagem}}.\nLane: {{lane}} | Farm: {{farm}} CS | Gold: {{gold}}\n\n{{zoeira}}';

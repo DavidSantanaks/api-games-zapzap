@@ -40,7 +40,7 @@
     return data;
   }
   const dirty = () => JSON.stringify(draft) !== JSON.stringify(saved);
-  const gameLabel = value => (value === 'cs2' ? 'CS2' : 'LOL');
+  const gameLabel = value => ({ cs2: 'CS2', r6: 'R6' })[value] || 'LOL';
 
   function setSaveState() {
     const badge = $('weekly-save-state');
@@ -206,7 +206,7 @@
   }
 
   function setGame(value) {
-    game = value === 'cs2' ? 'cs2' : 'lol';
+    game = value === 'cs2' || value === 'r6' ? value : 'lol';
     $('weekly-eyebrow').textContent = `O BALANÇO DA SEMANA · ${gameLabel(game)}`;
     schedulePreview();
   }

@@ -18,6 +18,8 @@
   let authDialogPlayer = null;
   const busyButtons = new WeakSet();
   const regions = { americas: 'Américas', europe: 'Europa', asia: 'Ásia', sea: 'Sudeste Asiático / Oceania' };
+  const isGameId = game => game === 'lol' || game === 'cs2' || game === 'r6';
+  let r6PlatformsLoaded = false;
   const statusLabels = { pending: 'Na fila', sent: 'Enviada', failed: 'Falha no envio' };
   const dates = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -82,11 +84,31 @@
   }
   function syncFormMode() {
     const isCs2 = activeGame === 'cs2';
-    setSectionControls($('lol-player-fields'), !isCs2);
+    const isR6 = activeGame === 'r6';
+    setSectionControls($('lol-player-fields'), activeGame === 'lol');
     setSectionControls($('cs2-player-fields'), isCs2);
-    $('game-name').required = !isCs2;
-    $('tag-line').required = !isCs2;
+    setSectionControls($('r6-player-fields'), isR6);
+    $('game-name').required = activeGame === 'lol';
+    $('tag-line').required = activeGame === 'lol';
     $('steam-id').required = isCs2;
+    $('r6-username').required = isR6;
+  }
+  // Plataformas do /v2/config da stats.cc, servidas pelo backend (a chave não passa pelo navegador).
+  async function loadR6Platforms() {
+    if (r6PlatformsLoaded) return;
+    r6PlatformsLoaded = true;
+    try {
+      const { platforms = [] } = await api('/api/r6/platforms');
+      if (!platforms.length) return;
+      const select = $('r6-platform');
+      const current = select.value;
+      select.replaceChildren(...platforms.map(platform => {
+        const option = el('option', '', platform.display);
+        option.value = platform.slug;
+        return option;
+      }));
+      if (platforms.some(platform => platform.slug === current)) select.value = current;
+    } catch { r6PlatformsLoaded = false; }
   }
   function syncDisabledStates() {
     const connect = $('connect-whatsapp');
@@ -108,7 +130,7 @@
     };
   }
   function setActiveGame(game) {
-    if (game !== 'lol' && game !== 'cs2') return;
+    if (!isGameId(game)) return;
     const changedGame = activeGame !== game;
     activeGame = game;
     window.ggActiveGame = game;
@@ -118,15 +140,19 @@
       tab.setAttribute('aria-pressed', String(current));
     });
     const isCs2 = game === 'cs2';
-    $('active-game-eyebrow').textContent = isCs2 ? 'COUNTER-STRIKE 2 · PREMIER E COMPETITIVO' : 'LEAGUE OF LEGENDS';
-    $('brand-subtitle').textContent = isCs2 ? 'DO BOMB PRO GRUPO' : 'DO NEXUS PRO GRUPO';
-    $('preview-game-tag').textContent = isCs2 ? 'EXEMPLO · CS2' : 'EXEMPLO';
-    $('players-footnote-text').textContent = isCs2
-      ? 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas Premier e Competitivo geram mensagens (dados via Steam e Leetify).'
-      : 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.';
+    const isR6 = game === 'r6';
+    $('active-game-eyebrow').textContent = isR6 ? 'RAINBOW SIX SIEGE · RANQUEADA, PADRÃO E LEGEND' : isCs2 ? 'COUNTER-STRIKE 2 · PREMIER E COMPETITIVO' : 'LEAGUE OF LEGENDS';
+    $('brand-subtitle').textContent = isR6 ? 'DO RAPEL PRO GRUPO' : isCs2 ? 'DO BOMB PRO GRUPO' : 'DO NEXUS PRO GRUPO';
+    $('preview-game-tag').textContent = isR6 ? 'EXEMPLO · R6' : isCs2 ? 'EXEMPLO · CS2' : 'EXEMPLO';
+    $('players-footnote-text').textContent = isR6
+      ? 'Ao cadastrar, a partida mais recente vira referência. Só novas partidas Ranqueada, Padrão e Legend Division geram mensagens (Data by Stats.cc).'
+      : isCs2
+        ? 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas Premier e Competitivo geram mensagens (dados via Steam e Leetify).'
+        : 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.';
     const supportTab = $('preview-support-tab');
-    if (supportTab) supportTab.hidden = isCs2;
-    if (isCs2 && selectedScenario === 'support') selectedScenario = 'carry';
+    if (supportTab) supportTab.hidden = game !== 'lol';
+    if (game !== 'lol' && selectedScenario === 'support') selectedScenario = 'carry';
+    if (isR6) loadR6Platforms();
     syncFormMode();
     lastPlayerRender = '';
     lastMatchRender = '';
@@ -151,6 +177,7 @@
     for (const key of ['players', 'matches', 'sent', 'pending']) $('stat-' + key).textContent = stats[key] ?? 0;
     $('riot-notice').hidden = activeGame !== 'lol' || !!state.riotConfigured;
     $('cs2-notice').hidden = activeGame !== 'cs2' || !!state.cs2Configured;
+    $('r6-notice').hidden = activeGame !== 'r6' || !!state.r6Configured;
     const active = !!state.settings.monitoringEnabled;
     const monitor = state.monitor || {};
     if (!busyButtons.has($('monitor-toggle'))) $('monitor-toggle').checked = active;
@@ -194,7 +221,8 @@
     if (!players.length) {
       list.append(emptyList(
         'Quem vai ser o primeiro?',
-        activeGame === 'cs2' ? 'Adicione o SteamID64 de um player para começar.' : 'Adicione o Riot ID de um player para começar.',
+        activeGame === 'r6' ? 'Escolha a plataforma e informe o nick do Siege para começar.'
+          : activeGame === 'cs2' ? 'Adicione o SteamID64 de um player para começar.' : 'Adicione o Riot ID de um player para começar.',
         '◎',
         true
       ));
@@ -211,13 +239,16 @@
         name.title = `${player.gameName}#${player.tagLine}`;
       } else if (isCs2) {
         name.title = `${player.gameName} (${player.steamId})`;
+      } else if (player.game === 'r6') {
+        name.title = `${player.gameName} (${player.platformLabel || player.platform})`;
       }
       const subtitle = el('span', 'player-region');
       const dot = el('span', 'player-status-dot');
       dot.setAttribute('aria-hidden', 'true');
       const detail = isCs2
         ? `SteamID ${player.steamId} · ${player.hasShareAuth ? 'Código Steam ativo' : 'Histórico Leetify'}`
-        : (regions[player.region] || player.region);
+        : player.game === 'r6' ? `${player.platformLabel || player.platform} · stats.cc`
+          : (regions[player.region] || player.region);
       subtitle.append(dot, document.createTextNode(`${player.enabled ? 'Monitorando' : 'Pausado'} · ${detail}`));
       info.append(name, subtitle);
       if (player.lastError) info.append(el('span', 'player-error', player.lastError));
@@ -268,12 +299,13 @@
     }
     for (const match of matches) {
       const isCs2 = match.game === 'cs2';
-      const outcome = isCs2
+      const isR6 = match.game === 'r6';
+      const outcome = isCs2 || isR6
         ? (match.result || (match.win === true ? 'win' : match.win === false ? 'loss' : 'draw'))
         : (match.win ? 'win' : 'loss');
       const toneClass = outcome === 'win' ? '' : outcome === 'draw' ? ' draw' : ' loss';
-      const resultText = outcome === 'win' ? 'VITÓRIA' : outcome === 'draw' ? 'EMPATE' : 'DERROTA';
-      const tileSource = isCs2 ? (match.mapLabel || match.map || 'CS').replace(/^(?:de|cs)_/i, '') : (match.champion || '?');
+      const resultText = isR6 && match.outcome === 'abandon' ? 'ABANDONO' : outcome === 'win' ? 'VITÓRIA' : outcome === 'draw' ? 'EMPATE' : 'DERROTA';
+      const tileSource = isR6 ? (match.mapLabel || 'R6') : isCs2 ? (match.mapLabel || match.map || 'CS').replace(/^(?:de|cs)_/i, '') : (match.champion || '?');
       const row = el('div', 'match-row');
       row.append(el('span', 'result-stripe' + toneClass), el('div', 'champion-tile', tileSource.slice(0, 2).toUpperCase()));
       const main = el('button', 'match-main match-info-button');
@@ -284,7 +316,11 @@
       name.title = match.playerName;
       top.append(name, el('span', 'match-result' + toneClass, resultText));
       let subText;
-      if (isCs2) {
+      if (isR6) {
+        const scorePart = match.score ? ` · ${match.score}` : '';
+        const pointsPart = Number.isFinite(match.rankPointsDelta) ? ` · ${match.rankPointsDelta > 0 ? '+' : ''}${match.rankPointsDelta} pts` : '';
+        subText = `${match.mode || 'R6'} · ${match.mapLabel || 'Mapa'}${scorePart}${pointsPart} · ${date(match.endedAt)}`;
+      } else if (isCs2) {
         const mapName = match.mapLabel || match.map || 'Mapa';
         const scorePart = match.score ? ` · ${match.score}` : '';
         const adrPart = match.adr !== null && match.adr !== undefined && Number.isFinite(Number(match.adr))
@@ -370,7 +406,7 @@
     }
   }
   async function loadPreview(scenario) {
-    if (activeGame === 'cs2' && scenario === 'support') scenario = 'carry';
+    if (activeGame !== 'lol' && scenario === 'support') scenario = 'carry';
     selectedScenario = scenario;
     const game = activeGame;
     const reqId = ++previewRequestId;
@@ -400,7 +436,7 @@
     dialogMatch = match;
     $('dialog-title').textContent = match.playerName;
     $('dialog-message').textContent = match.message;
-    const scorePart = match.game === 'cs2' && match.score ? ` · ${match.mapLabel || match.map || ''} (${match.score})` : '';
+    const scorePart = (match.game === 'cs2' || match.game === 'r6') && match.score ? ` · ${match.mapLabel || match.map || ''} (${match.score})` : '';
     $('dialog-meta').textContent = `${statusLabels[match.status] || match.status}${match.mode ? ' · ' + match.mode : ''}${scorePart} · ${date(match.endedAt)}${match.error ? ' · ' + match.error : ''}`;
     const leetifyWrap = $('dialog-leetify-wrap');
     if (leetifyWrap) {
@@ -440,6 +476,20 @@
   }));
   $('player-form').addEventListener('submit', event => {
     event.preventDefault();
+    if (activeGame === 'r6') {
+      action($('add-r6-player'), async () => {
+        await api('/api/players', 'POST', {
+          game: 'r6',
+          platform: $('r6-platform').value,
+          username: $('r6-username').value.trim(),
+        });
+        $('r6-username').value = '';
+        toast('Player de R6 cadastrado. A partida mais recente será usada como referência.');
+        await refresh();
+        $('r6-username').focus();
+      });
+      return;
+    }
     if (activeGame === 'cs2') {
       action($('add-cs2-player'), async () => {
         await api('/api/players', 'POST', {
