@@ -24,7 +24,9 @@ docker compose up -d --build
 
 Abra **http://localhost:3000**. Sem chaves, a interface e as prévias funcionam normalmente; o cadastro real e o monitor dependem da credencial do respectivo jogo.
 
-1. Escolha a aba **League of Legends** ou **Counter-Strike 2**:
+A interface tem um menu lateral (no celular, no topo) com o seletor de jogo e as seções **Painel**, **Players**, **Mensagens**, **Resumo semanal** e **WhatsApp**. O status do monitor e do WhatsApp fica sempre visível no menu.
+
+1. No menu, escolha **League of Legends** ou **Counter-Strike 2** e abra **Players**:
    - **LoL:** cadastre o nick e a tag separadamente (`SeuAmigo` e `BR1`). Para o servidor brasileiro, use **Américas**.
    - **CS2:** informe o **SteamID64** de 17 dígitos (ou a URL `https://steamcommunity.com/profiles/...`) e, opcionalmente, a autorização de partidas da Steam (veja abaixo).
 2. Clique em **Conectar WhatsApp**. No celular, abra **Aparelhos conectados → Conectar aparelho** e leia o QR Code.
@@ -218,7 +220,7 @@ Os testes usam respostas simuladas da Riot, da Steam, do Leetify e do WhatsApp; 
 ## Estrutura
 
 ```text
-public/              Interface responsiva com abas LoL e CS2, sem build
+public/              Interface responsiva (tema roxo, menu lateral e seções), sem build
 public/messages.js   Editor de mensagens e prévias do rascunho por jogo
 public/weekly.js     Configuração, editor e prévia do resumo semanal
 src/app.js           Rotas HTTP, validação e isolamento por jogo

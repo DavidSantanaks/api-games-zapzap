@@ -54,6 +54,7 @@ Atualizada em **09/11/2026**. Leia este arquivo e o [README](README.md) antes de
 - `Monitor.generateWeeklyReports()` roda em cada ciclo (monitor ativo), até 24h após o horário; `deliverWeeklyReports()` envia depois das partidas, com até 5 tentativas e ID de mensagem estável. Jogadores pausados ficam fora do resumo.
 - Rotas: `GET /api/weekly`, `GET /api/weekly/defaults`, `PUT /api/weekly/settings`, `PUT /api/weekly/config`, `POST /api/weekly/preview` (`current`/`last`/`example`, nunca envia), `POST /api/weekly/reports/:id/retry`.
 - Interface: seção **Resumo semanal** (`public/weekly.js`) com liga/desliga, dia e hora, faixas, editor com variáveis clicáveis, prévia pela aba ativa e histórico de resumos.
+- **Visual (10/11/2026, a pedido do usuário):** tema roxo (o usuário gosta de roxo) e layout reorganizado em menu lateral com seções separadas — Painel (contadores, monitor, últimas partidas, amostra), Players, Mensagens, Resumo semanal e WhatsApp. Vitória/conexão continuam em verde e derrota em vermelho. Abaixo de 1180px o menu vai para o topo com rolagem horizontal. O modo "Ampliar" do editor torna inerte tudo fora do estúdio em qualquer nível (`setFocusMode` em `public/messages.js`). Textos pequenos foram aumentados para leitura.
 
 ## Editor de mensagens (motor comum em `src/message.js`)
 
@@ -127,6 +128,7 @@ No LoL, `{{modo}}` usa primeiro `queueId`, diferenciando Ranqueada Solo/Duo, Fle
 | `public/app.js` | Abas de jogo, dashboard, jogadores, modal de código Steam, WhatsApp e histórico |
 | `public/messages.js` | Editor por jogo, rascunhos isolados por aba, busca, inserção e prévia |
 | `public/weekly.js` | Seção do resumo semanal: agenda, editor, prévia e histórico |
+| `public/nav.js` | Navegação por seções via hash (`#painel`, `#players`, `#mensagens`, `#resumo-semanal`, `#whatsapp`; `#setup` vira painel) e espelho dos status do monitor/WhatsApp no menu |
 | `public/index.html`, `public/style.css` | Estrutura e apresentação da interface |
 | `test/` | Testes offline de domínio, HTTP, CS2, monitor, sessão e migrações |
 
