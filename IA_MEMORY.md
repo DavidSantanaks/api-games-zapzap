@@ -1,6 +1,6 @@
 # Memória do projeto — GG Report
 
-Atualizada em **06/11/2026**. Leia este arquivo e o [README](README.md) antes de continuar o desenvolvimento. Registre decisões e entregas novas aqui, sem incluir credenciais ou dados da instalação do usuário.
+Atualizada em **09/11/2026**. Leia este arquivo e o [README](README.md) antes de continuar o desenvolvimento. Registre decisões e entregas novas aqui, sem incluir credenciais ou dados da instalação do usuário.
 
 ## Objetivo e preferências
 
@@ -42,6 +42,19 @@ Atualizada em **06/11/2026**. Leia este arquivo e o [README](README.md) antes de
 - Atribuição exigida pelo provedor incluída na aba e no diálogo de detalhes do CS2 (`Data Provided by Leetify` + link `View on Leetify` quando há `leetifyMatchId`).
 - Segredos protegidos: `STEAM_API_KEY`, `LEETIFY_API_KEY`, `authCode` e `knownCode` nunca vão para `/api/state` (que expõe apenas `hasShareAuth`) e estão na lista `redact` do Pino em `src/server.js`.
 
+### Resumo semanal (09/11/2026)
+
+- Pedido do usuário: todo domingo, contar vitórias e derrotas e mandar zoeira ou quase elogio; **elogio só em casos raros**.
+- `src/weekly.js`: janela semanal no fuso `America/Sao_Paulo` (padrão domingo 21h, `weeklyDay`/`weeklyHour` nas configurações, `weeklyEnabled` padrão `true`). Semanas contíguas: (agendamento anterior, agendamento atual]. Chave da semana = data local do envio (`2026-11-08`).
+- Conta partidas pela **data de detecção** (`createdAt` do payload em `matches`), não pelo `endedAt`, para não perder nem duplicar partidas detectadas depois do horário (demo do CS2 atrasada).
+- Faixas: sumido (< 3 partidas), bagre (< 40%), mediano (40–54%), obrigação (≥ 55%), elogio contido (≥ 70% **e** ≥ 15 partidas **e** KDA da semana ≥ 3,0; endurecido a pedido do usuário). Taxa ignora empates; KDA da semana soma tudo antes de dividir. Limites em `WEEKLY_RULES`.
+- Frases padrão mais ácidas (v2, 09/11/2026). `WEEKLY_CONFIG_V1` fica só como snapshot: na inicialização, se `weekly_config` for exatamente a v1, vira a v2; qualquer edição do usuário é preservada.
+- Uma mensagem por jogo com ranking (🥇🥈🥉, depois 4º…; sumidos com 💤 no fim), destaque e bagre (este só com 2+ jogadores ativos). Frase escolhida de forma determinística por semana e jogador.
+- Persistência aditiva: tabelas `weekly_config` (modelo, linhas e frases compartilhados entre LoL e CS2) e `weekly_reports` (`UNIQUE(game, week_key)`, status `pending`/`sent`/`failed`/`skipped`). Semana sem partidas vira `skipped` e não envia.
+- `Monitor.generateWeeklyReports()` roda em cada ciclo (monitor ativo), até 24h após o horário; `deliverWeeklyReports()` envia depois das partidas, com até 5 tentativas e ID de mensagem estável. Jogadores pausados ficam fora do resumo.
+- Rotas: `GET /api/weekly`, `GET /api/weekly/defaults`, `PUT /api/weekly/settings`, `PUT /api/weekly/config`, `POST /api/weekly/preview` (`current`/`last`/`example`, nunca envia), `POST /api/weekly/reports/:id/retry`.
+- Interface: seção **Resumo semanal** (`public/weekly.js`) com liga/desliga, dia e hora, faixas, editor com variáveis clicáveis, prévia pela aba ativa e histórico de resumos.
+
 ## Editor de mensagens (motor comum em `src/message.js`)
 
 - Motor reutilizável `createMessageEngine(profile)` compartilhado entre `lolMessages` (`src/message.js`) e `cs2Messages` (`src/cs2-message.js`), mantendo 100% das exportações originais do LoL compatíveis.
@@ -77,8 +90,9 @@ No LoL, `{{modo}}` usa primeiro `queueId`, diferenciando Ranqueada Solo/Duo, Fle
 
 - O cálculo único nos dois jogos é `(abates + assistências) / máximo(1, mortes)`, por partida, sem arredondar na comparação de limites:
   - **KDA < 1:** `feed`, zoeira.
-  - **1 ≤ KDA < 2,5:** `normal`, obrigação. O padrão começa com “NÃO FEZ MAIS QUE A OBRIGAÇÃO”.
-  - **KDA ≥ 2,5:** `carry`, elogio moderado; no LoL, na lane `SUP`, usa `support` com os mesmos limites.
+  - **KDA ≥ 1 sem elogio:** `normal`, obrigação. O padrão começa com “NÃO FEZ MAIS QUE A OBRIGAÇÃO”.
+  - **Elogio (`carry`) endurecido em 10/11/2026 a pedido do usuário:** LoL exige KDA ≥ 4 **e** vitória (`LOL_PRAISE_MIN_KDA`); CS2 exige KDA ≥ 3 **e** vitória (`CS2_PRAISE_MIN_KDA`). Derrota ou empate com KDA alto cai em `normal`. No LoL, na lane `SUP`, usa `support` com o mesmo limite.
+- Frases padrão mais ácidas e em maior número (10/11/2026): LoL 51 (feed 15, carry 12, support 10, normal 14) e CS2 39 (feed 14, normal 13, carry 12). Snapshots antigos ficam em `LOL_PHRASES_KDA_V1`, `LEGACY_PHRASE_POOLS` e `CS2_PHRASES_V1`, expostos por `previousPhrasePools()`. A migração única `message-acid-phrases-v1` troca só categorias idênticas a um snapshot, em cada jogo, e pula a categoria se a validação de tamanho falhar.
 - O valor exibido tem duas casas decimais em pt-BR. Prévias retornam `performance` com KDA numérico, faixa, rótulo e intervalo.
 
 ## Regras de preservação importantes
@@ -109,8 +123,10 @@ No LoL, `{{modo}}` usa primeiro `queueId`, diferenciando Ranqueada Solo/Duo, Fle
 | `src/monitor.js` | Polling multi-jogo (`lol` e `cs2`), espera de demo `.dem` e envio da fila |
 | `src/store.js` | SQLite, configurações, migrações aditivas, modelos por jogo, jogadores e fila |
 | `src/whatsapp.js` | Baileys, QR, grupos, reconexão e sessão |
+| `src/weekly.js` | Janela semanal no fuso de São Paulo, faixas, ranking e mensagem do resumo semanal |
 | `public/app.js` | Abas de jogo, dashboard, jogadores, modal de código Steam, WhatsApp e histórico |
 | `public/messages.js` | Editor por jogo, rascunhos isolados por aba, busca, inserção e prévia |
+| `public/weekly.js` | Seção do resumo semanal: agenda, editor, prévia e histórico |
 | `public/index.html`, `public/style.css` | Estrutura e apresentação da interface |
 | `test/` | Testes offline de domínio, HTTP, CS2, monitor, sessão e migrações |
 
@@ -133,6 +149,9 @@ docker compose up -d --build --wait
 Credenciais ficam no ambiente (ou protegidas no SQLite no caso de `authCode`/`knownCode`), nunca expostas no frontend. `APP_PASSWORD` oferece HTTP Basic opcional com usuário `admin`.
 
 ## Validação conhecida
+
+- Frases por partida (10/11/2026): 99 testes passando, incluindo `test/phrases-migration.test.js`.
+- Resumo semanal (09/11/2026): **99 testes passando** (9 novos em `test/weekly.test.js`: janela e fuso, faixas e raridade do elogio, empates, ranking, validação, envio único por semana, tolerância de 24h, reenvio e rotas). `npm run check` passou; seção verificada em Chrome headless (desktop 1400px e celular 390px, sem rolagem horizontal).
 
 - Entrega atual (LoL + CS2): **89 testes passando** tanto no Windows quanto dentro do container Linux (`node:24-bookworm-slim`), cobrindo LoL, decodificação base57 `CSGO-...`, `GetNextMatchSharingCode`, espera de demo `.dem`, empates, `N/A` sem inventar dados, isolamento entre abas/rotas, deduplicação após reinício e migração aditiva do SQLite preservando dados anteriores.
 - `npm run check` passou; container reconstruído com `gg-data` preservado, healthcheck saudável (`healthy`) e imagem de produção verificada por HTTP em ambiente isolado.

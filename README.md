@@ -1,6 +1,6 @@
 # GG Report
 
-Partidas de **League of Legends** e **Counter-Strike 2 (Premier e Competitivo)** viram um resumo com estatísticas e zoeira no grupo do WhatsApp. Projeto pessoal leve: **Node.js 24 + SQLite + HTML/CSS/JavaScript**, em **um container**. Sem Java, Chromium, Redis, banco separado ou serviço de IA.
+Partidas de **League of Legends** e **Counter-Strike 2 (Premier e Competitivo)** viram um resumo com estatísticas e zoeira no grupo do WhatsApp, além de um **resumo semanal** com o ranking de vitórias e derrotas todo domingo. Projeto pessoal leve: **Node.js 24 + SQLite + HTML/CSS/JavaScript**, em **um container**. Sem Java, Chromium, Redis, banco separado ou serviço de IA.
 
 Documentação do desenvolvimento: [memória do projeto](IA_MEMORY.md), [melhorias sugeridas](MELHORIAS.md) e [instruções para agentes](AGENTS.md).
 
@@ -101,24 +101,63 @@ O monitoramento de CS2 acompanha exclusivamente partidas oficiais **Premier** e 
 
 Cada aba (**League of Legends** e **Counter-Strike 2**) tem seu próprio editor em **Mensagens**, com rascunho, modelos, frases e prévias independentes. Use campos entre chaves duplas, como `{{player}}`, `{{frag}}` e `{{modo}}`; os botões de variáveis inserem o campo na posição do cursor. Encontre os campos pela busca ou pelos grupos, escreva na área de texto ampliada e acompanhe a prévia ao lado.
 
-- **League of Legends:** 22 variáveis (`jogo`, `modo`, `resultado`, `resultado_emoji`, `player`, `nick`, `tag`, `frag`, `kills`, `deaths`, `assists`, `kda`, `personagem`, `farm`, `lane`, `gold`, `gold_bruto`, `duracao`, `duracao_segundos`, `data`, `partida_id`, `zoeira`), três variações iniciais e 28 frases entre **Zoeira**, **Obrigação**, **Elogio** e **Elogio ao suporte**.
-- **Counter-Strike 2:** 21 variáveis (`jogo`, `modo`, `resultado`, `resultado_emoji`, `player`, `nick`, `frag`, `kills`, `deaths`, `assists`, `kda`, `mapa`, `placar`, `adr`, `dano`, `rounds`, `mvps`, `hs`, `data`, `partida_id`, `zoeira`), três variações iniciais e 22 frases entre **Zoeira**, **Obrigação** e **Elogio**. Em empates (`12 x 12` no Competitivo ou `15 x 15` no Premier), `{{resultado}}` exibe `EMPATE` com `🟡`.
+- **League of Legends:** 22 variáveis (`jogo`, `modo`, `resultado`, `resultado_emoji`, `player`, `nick`, `tag`, `frag`, `kills`, `deaths`, `assists`, `kda`, `personagem`, `farm`, `lane`, `gold`, `gold_bruto`, `duracao`, `duracao_segundos`, `data`, `partida_id`, `zoeira`), três variações iniciais e 51 frases entre **Zoeira**, **Obrigação**, **Elogio** e **Elogio ao suporte**.
+- **Counter-Strike 2:** 21 variáveis (`jogo`, `modo`, `resultado`, `resultado_emoji`, `player`, `nick`, `frag`, `kills`, `deaths`, `assists`, `kda`, `mapa`, `placar`, `adr`, `dano`, `rounds`, `mvps`, `hs`, `data`, `partida_id`, `zoeira`), três variações iniciais e 39 frases entre **Zoeira**, **Obrigação** e **Elogio**. Em empates (`12 x 12` no Competitivo ou `15 x 15` no Premier), `{{resultado}}` exibe `EMPATE` com `🟡`.
 
 No LoL, `{{modo}}` usa primeiro a fila da partida ([lista de filas da Riot](https://static.developer.riotgames.com/docs/lol/queues.json)) e depois o modo bruto como alternativa, diferenciando **Ranqueada Solo/Duo**, **Ranqueada Flex**, **Normal** e **ARAM**. No CS2, `{{modo}}` distingue **Premier** e **Competitivo**, e `{{mapa}}` formata nomes internos como `de_mirage` para `Mirage`.
 
 `{{kda}}` mostra **(abates + assistências) ÷ máximo(1, mortes)** nos dois jogos. Quando o jogador não morreu, o divisor é 1. O texto usa duas casas decimais; a seleção da frase considera o valor completo, antes de arredondar.
 
-| KDA da partida | Comentário escolhido |
+| Partida | Comentário escolhido |
 | --- | --- |
-| Menor que 1 | Zoeira |
-| De 1 até abaixo de 2,5 | Obrigação: “NÃO FEZ MAIS QUE A OBRIGAÇÃO” |
-| A partir de 2,5 | Elogio moderado |
+| KDA menor que 1 | Zoeira ácida, mesmo com vitória |
+| KDA 1 ou mais, sem atingir o elogio | Obrigação: “NÃO FEZ MAIS QUE A OBRIGAÇÃO” |
+| **LoL:** KDA 4 ou mais **e** vitória · **CS2:** KDA 3 ou mais **e** vitória | Elogio raro, sempre com alfinetada |
 
-No LoL, jogadores da lane `SUP` na faixa positiva (`KDA ≥ 2,5`) usam as frases de **Elogio ao suporte**; por exemplo, `1/5/9` resulta em **2,00**, então recebe obrigação inclusive para suporte.
+Derrota (ou empate no CS2) nunca recebe elogio, por maior que seja o KDA. No LoL, jogadores da lane `SUP` que atingem o elogio usam as frases de **Elogio ao suporte**; por exemplo, `1/5/9` resulta em **2,00** e recebe obrigação, e `1/5/19` com vitória resulta em **4,00** e recebe elogio ao suporte.
+
+As frases padrão antigas que nunca foram editadas são trocadas pelas novas automaticamente, uma vez, na inicialização; categorias editadas ficam como estão.
 
 Edite as frases com **uma frase por linha**. Elas também aceitam variáveis; a variável `{{zoeira}}` pertence apenas ao modelo completo. Enquanto você escreve, a prévia usa o rascunho sem salvar e permanece preservada ao alternar entre as abas de LoL e CS2. **A prévia não consulta APIs externas, não grava partidas e não envia mensagens ao WhatsApp.**
 
 Clique em **Salvar mensagens** para aplicar às próximas partidas detectadas do jogo selecionado. **Carregar modelos originais** apenas preenche o rascunho; salve se quiser aplicá-los. Mensagens que já estavam na fila mantêm o texto registrado quando foram criadas.
+
+## Resumo semanal
+
+Todo **domingo às 21h** (horário de Brasília; dia e hora ajustáveis na seção **Resumo semanal**), o GG Report envia **uma mensagem por jogo** ao grupo com o ranking de vitórias e derrotas da semana:
+
+```text
+📅 RESUMO SEMANAL — LOL
+Semana de 03/11 a 09/11
+
+🥇 SeuAmigo#BR1 — 12V 5D (71%) · KDA 3,10
+Semana de smurf. Suspeito, mas os números não mentem: 12V 5D.
+
+🥈 Fulano#BR1 — 3V 9D (25%) · KDA 0,58
+Semana tão ruim que até o matchmaking pediu desculpa pros seus aliados.
+
+💤 Sicrano#BR1 — 1 partida
+Semana de folga. Não perdeu ponto porque nem teve coragem de jogar.
+
+🏆 Destaque: SeuAmigo#BR1
+🐟 Bagre da semana: Fulano#BR1
+```
+
+A frase de cada jogador depende da faixa. **O elogio é raro de propósito:** exige as três condições ao mesmo tempo.
+
+| Faixa | Condição | Tom |
+| --- | --- | --- |
+| Sumido | menos de 3 partidas | zoeira por não jogar |
+| Bagre | taxa de vitória abaixo de 40% | zoeira ácida |
+| Mediano | 40% a 54% | zoeira leve |
+| Obrigação | 55% ou mais, sem atingir o elogio | “NÃO FEZ MAIS QUE A OBRIGAÇÃO”, troféu de participação |
+| Elogio contido | 70% ou mais **e** 15+ partidas **e** KDA da semana ≥ 3,0 | quase elogio, sempre com alfinetada |
+
+- **Taxa de vitória:** vitórias ÷ (vitórias + derrotas); empates do CS2 não entram. **KDA da semana:** (abates + assistências) ÷ mortes, somando todas as partidas.
+- **Quem entra:** jogadores ativos do jogo. Pausados ficam fora; quem não jogou aparece como sumido. Semana sem nenhuma partida não envia mensagem.
+- **Quais partidas contam:** as que o monitor **detectou** na semana (do horário de envio anterior até o atual). Assim nenhuma partida conta duas vezes nem se perde; uma partida de CS2 terminada perto das 21h cuja demo demore pode entrar na semana seguinte.
+- **Envio:** acontece na primeira verificação após o horário, com o monitor ativo e o WhatsApp conectado. Se o app estiver desligado, o resumo sai em até 24 horas; depois disso, a semana é pulada. Cada semana é registrada uma única vez por jogo (reiniciar o Docker não repete), com até cinco tentativas e botão para reenviar.
+- **Personalização:** modelo da mensagem (precisa de `{{ranking}}`), linha de quem jogou, linha de quem sumiu e frases de cada faixa. A prévia usa a semana em andamento, a última semana encerrada ou um exemplo fictício, **sem enviar nada**.
 
 ## Como funciona
 
@@ -181,6 +220,7 @@ Os testes usam respostas simuladas da Riot, da Steam, do Leetify e do WhatsApp; 
 ```text
 public/              Interface responsiva com abas LoL e CS2, sem build
 public/messages.js   Editor de mensagens e prévias do rascunho por jogo
+public/weekly.js     Configuração, editor e prévia do resumo semanal
 src/app.js           Rotas HTTP, validação e isolamento por jogo
 src/server.js        Inicialização, redaction de logs e encerramento
 src/games.js         Registro dos jogos suportados (lol e cs2)
@@ -193,6 +233,7 @@ src/cs2-message.js   Variáveis, modelos, faixas de KDA e prévias do Counter-St
 src/monitor.js       Consultas periódicas multi-jogo e fila compartilhada
 src/store.js         Persistência SQLite e migrações aditivas
 src/whatsapp.js      QR Code, grupos e sessão Baileys
+src/weekly.js        Semana no fuso de São Paulo, faixas, ranking e mensagem do resumo semanal
 test/                Testes offline de domínio, HTTP, monitor, sessão e migrações
 ```
 

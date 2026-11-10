@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { formatMessage } from './message.js';
-import { messagesFor } from './games.js';
+import { GAME_IDS, messagesFor } from './games.js';
+import { dueWeeklyWindow, renderWeeklyReport, summarizeWeek } from './weekly.js';
 
 const RIOT_MISSING = 'Configure RIOT_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 const CS2_MISSING = 'Configure STEAM_API_KEY (e opcionalmente LEETIFY_API_KEY) no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 
 export class Monitor {
-  constructor({ store, riot, cs2 = null, whatsapp, logger = console }) {
-    Object.assign(this, { store, riot, cs2, whatsapp, logger });
+  constructor({ store, riot, cs2 = null, whatsapp, logger = console, now = () => Date.now() }) {
+    Object.assign(this, { store, riot, cs2, whatsapp, logger, now });
     this.running = false;
     this.lastCheckAt = null;
     this.lastError = null;
@@ -66,6 +67,8 @@ export class Monitor {
           if (error.retryAfterMs > 0) rateLimited.add(game);
         }
       }
+      try { this.generateWeeklyReports(); }
+      catch (error) { this.logger.error({ err: error.message }, 'Falha ao gerar o resumo semanal'); }
       await this.deliver();
     } catch (error) {
       this.lastError = error.message;
@@ -165,8 +168,53 @@ export class Monitor {
       this.store.updatePlayer(player.id, { lastSeenMatchId: newestId });
     }
   }
+  /**
+   * Gera, uma única vez por jogo e semana, o resumo das partidas detectadas na semana encerrada.
+   * Só roda até 24 horas depois do horário agendado; semanas sem partidas ficam registradas como puladas.
+   */
+  generateWeeklyReports() {
+    const settings = this.store.settings();
+    if (!settings.weeklyEnabled || !settings.whatsappGroupId) return [];
+    const week = dueWeeklyWindow(this.now(), { weeklyDay: settings.weeklyDay, weeklyHour: settings.weeklyHour });
+    if (!week) return [];
+    const created = [];
+    for (const game of GAME_IDS) {
+      if (this.store.hasWeeklyReport(game, week.key)) continue;
+      const players = this.store.players(game).filter(player => player.enabled);
+      const summaries = summarizeWeek(players, this.store.matchesDetectedBetween(game, week.start, week.end));
+      const report = renderWeeklyReport({ game, summaries, period: week.period, seed: week.key, config: this.store.weeklyConfig() });
+      const entry = this.store.addWeeklyReport({
+        game, weekKey: week.key, period: week.period, start: week.start, end: week.end,
+        message: report?.message || null, groupId: settings.whatsappGroupId, players: report?.players || [],
+      });
+      if (entry) created.push(entry);
+    }
+    return created;
+  }
+  messageId(seed) {
+    return '3EB0' + createHash('sha256').update(seed).digest('hex').slice(0, 28).toUpperCase();
+  }
   async deliver() {
     if (this.whatsapp.status().state !== 'connected') return;
+    await this.deliverMatches();
+    await this.deliverWeeklyReports();
+  }
+  async deliverWeeklyReports() {
+    for (const report of this.store.dueWeeklyReports(this.now())) {
+      if (this.stopped || !this.store.settings().monitoringEnabled) break;
+      try {
+        await this.whatsapp.send(report.groupId, report.message, { messageId: this.messageId(`weekly:${report.id}`) });
+        this.store.updateWeeklyReport(report.id, { status: 'sent', sentAt: new Date(this.now()).toISOString(), error: null });
+      } catch (error) {
+        const attempts = report.attempts + 1;
+        this.store.updateWeeklyReport(report.id, {
+          status: 'failed', attempts, error: error.message,
+          nextAttemptAt: this.now() + Math.min(60_000 * 2 ** (attempts - 1), 900_000),
+        });
+      }
+    }
+  }
+  async deliverMatches() {
     for (const entry of this.store.dueDeliveries()) {
       if (this.stopped || !this.store.settings().monitoringEnabled) break;
       if (!this.store.player(entry.playerId)?.enabled) continue;

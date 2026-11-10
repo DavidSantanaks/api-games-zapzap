@@ -200,7 +200,7 @@ test('preview validates selection options and can explicitly preview a disabled 
 test('stored-match preview uses the selected real stats and original Riot match ID without touching the queue', async t => {
   const app = await fixture(t);
   const player = app.addPlayer();
-  const summary = matchSummary('BR1_stored', { champion: 'Thresh', kills: 4, deaths: 2, assists: 25, lane: 'SUP' });
+  const summary = matchSummary('BR1_stored', { champion: 'Thresh', kills: 4, deaths: 2, assists: 25, lane: 'SUP', win: true });
   const entry = app.store.addMatch(player, summary, 'Already queued snapshot', GROUP);
   const draft = customized(await app.config(), '{{partida_id}} | {{player}} | {{personagem}} | {{frag}} | {{lane}}');
   const before = clone(app.store.matches());
@@ -257,13 +257,15 @@ test('stored-match KDA chooses roast, obligation and positive pools without rewr
   const cases = [
     { kills: 1, deaths: 8, assists: 3, lane: 'SUP', kda: 0.5, category: 'feed', band: 'feed', phrase: 'ZOEIRA para Amigo' },
     { kills: 1, deaths: 5, assists: 9, lane: 'SUP', kda: 2, category: 'normal', band: 'normal', phrase: 'NÃO FEZ MAIS QUE A OBRIGAÇÃO' },
-    { kills: 2, deaths: 2, assists: 3, lane: 'MID', kda: 2.5, category: 'carry', band: 'carry', phrase: 'ELOGIO MODERADO para Amigo' },
-    { kills: 2, deaths: 2, assists: 3, lane: 'SUP', kda: 2.5, category: 'support', band: 'carry', phrase: 'ELOGIO AO SUP com 3 assistências' },
-    { kills: 3, deaths: 0, assists: 1, lane: 'MID', kda: 4, category: 'carry', band: 'carry', phrase: 'ELOGIO MODERADO para Amigo' },
+    { kills: 2, deaths: 2, assists: 3, lane: 'MID', kda: 2.5, category: 'normal', band: 'normal', phrase: 'NÃO FEZ MAIS QUE A OBRIGAÇÃO', win: true },
+    { kills: 4, deaths: 2, assists: 4, lane: 'MID', kda: 4, category: 'carry', band: 'carry', phrase: 'ELOGIO MODERADO para Amigo', win: true },
+    { kills: 4, deaths: 2, assists: 4, lane: 'SUP', kda: 4, category: 'support', band: 'carry', phrase: 'ELOGIO AO SUP com 4 assistências', win: true },
+    { kills: 4, deaths: 2, assists: 4, lane: 'MID', kda: 4, category: 'normal', band: 'normal', phrase: 'NÃO FEZ MAIS QUE A OBRIGAÇÃO', win: false },
+    { kills: 3, deaths: 0, assists: 1, lane: 'MID', kda: 4, category: 'carry', band: 'carry', phrase: 'ELOGIO MODERADO para Amigo', win: true },
   ];
   for (const [index, sample] of cases.entries()) {
-    const { kills, deaths, assists, lane } = sample;
-    const entry = app.store.addMatch(player, matchSummary(`BR1_kda_${index}`, { kills, deaths, assists, lane }), 'Texto já registrado na fila', GROUP);
+    const { kills, deaths, assists, lane, win = false } = sample;
+    const entry = app.store.addMatch(player, matchSummary(`BR1_kda_${index}`, { kills, deaths, assists, lane, win }), 'Texto já registrado na fila', GROUP);
     const before = clone(app.store.match(entry.id));
     const response = await app.request('/api/message-preview', 'POST', { matchId: entry.id });
     assert.equal(response.status, 200);
@@ -296,7 +298,7 @@ test('opening a database from before the editor preserves data and saved message
   store.close();
   store = null;
   store = new Store(filename);
-  assert.deepEqual(store.settings(), oldSettings);
+  assert.deepEqual(store.settings(), { ...oldSettings, weeklyEnabled: true, weeklyDay: 0, weeklyHour: 21 });
   assert.equal(store.player(player.id).puuid, 'legacy-puuid');
   assert.equal(store.match(entry.id).message, 'Old queued text');
   const draft = customized(store.messageConfig(), 'Persistiu: {{player}} na {{lane}}');
@@ -305,6 +307,6 @@ test('opening a database from before the editor preserves data and saved message
   store = null;
   store = new Store(filename);
   assert.deepEqual(store.messageConfig(), draft);
-  assert.deepEqual(store.settings(), oldSettings);
+  assert.deepEqual(store.settings(), { ...oldSettings, weeklyEnabled: true, weeklyDay: 0, weeklyHour: 21 });
   assert.equal(store.match(entry.id).message, 'Old queued text');
 });

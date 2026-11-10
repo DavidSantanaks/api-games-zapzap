@@ -6,6 +6,10 @@ import { gameModeLabel } from './game-mode.js';
 import { mapLabel } from './cs2-message.js';
 import { Cs2Client, normalizeSteamId } from './cs2.js';
 import { GAMES, isGame, messagesFor } from './games.js';
+import {
+  WEEKLY_BANDS, WEEKLY_LINE_VARIABLES, WEEKLY_RULES, WEEKLY_TEMPLATE_VARIABLES, currentWeeklyWindow,
+  exampleWeekSummaries, getDefaultWeeklyConfig, lastWeeklyWindow, renderWeeklyReport, summarizeWeek, validateWeeklyConfig,
+} from './weekly.js';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -41,7 +45,10 @@ const withPerformance = (game, preview) => {
   } };
 };
 
-export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monitor, password = '', logger = console }) {
+const publicWeeklyReport = ({ groupId, ...report }) => report;
+const weeklySchedule = settings => ({ weeklyDay: settings.weeklyDay, weeklyHour: settings.weeklyHour });
+
+export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monitor, password = '', logger = console, now = () => Date.now() }) {
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -297,6 +304,72 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monito
     const match = store.updateDelivery(entry.id, { status: 'pending', attempts: 0, error: null, nextAttemptAt: 0 });
     monitor.refresh();
     res.json({ match });
+  });
+
+  const weeklyState = config => {
+    const settings = store.settings();
+    const next = currentWeeklyWindow(now(), weeklySchedule(settings));
+    return {
+      settings: { enabled: settings.weeklyEnabled, day: settings.weeklyDay, hour: settings.weeklyHour },
+      next: { key: next.key, period: next.period, scheduledAt: new Date(next.end).toISOString() },
+      config,
+      templateVariables: WEEKLY_TEMPLATE_VARIABLES,
+      lineVariables: WEEKLY_LINE_VARIABLES,
+      bands: WEEKLY_BANDS,
+      rules: WEEKLY_RULES,
+      reports: store.weeklyReports(12).map(publicWeeklyReport),
+    };
+  };
+  app.get('/api/weekly', (_req, res) => res.json(weeklyState(store.weeklyConfig())));
+  app.get('/api/weekly/defaults', (_req, res) => res.json(weeklyState(getDefaultWeeklyConfig())));
+  app.put('/api/weekly/settings', (req, res) => {
+    const patch = {};
+    if (req.body.enabled !== undefined) {
+      if (typeof req.body.enabled !== 'boolean') fail(400, 'Informe se o resumo semanal está ativo.');
+      patch.weeklyEnabled = req.body.enabled;
+    }
+    if (req.body.day !== undefined) {
+      if (!Number.isInteger(req.body.day) || req.body.day < 0 || req.body.day > 6) fail(400, 'Escolha um dia da semana válido.');
+      patch.weeklyDay = req.body.day;
+    }
+    if (req.body.hour !== undefined) {
+      if (!Number.isInteger(req.body.hour) || req.body.hour < 0 || req.body.hour > 23) fail(400, 'Escolha uma hora entre 0 e 23.');
+      patch.weeklyHour = req.body.hour;
+    }
+    if (!Object.keys(patch).length) fail(400, 'Informe a alteração desejada para o resumo semanal.');
+    store.updateSettings(patch);
+    res.json(weeklyState(store.weeklyConfig()));
+  });
+  app.put('/api/weekly/config', (req, res) => {
+    res.json(weeklyState(store.updateWeeklyConfig(req.body.config)));
+  });
+  // Prévia: monta o resumo com dados reais (semana atual ou última encerrada) ou de exemplo. Nunca envia nem grava.
+  app.post('/api/weekly/preview', (req, res) => {
+    const game = parseGame(req.body.game);
+    const source = req.body.source ?? 'current';
+    if (!['current', 'last', 'example'].includes(source)) fail(400, 'Escolha os dados da prévia: current, last ou example.');
+    const config = validateWeeklyConfig(req.body.config === undefined ? store.weeklyConfig() : req.body.config);
+    const schedule = weeklySchedule(store.settings());
+    const window = source === 'last' ? lastWeeklyWindow(now(), schedule) : currentWeeklyWindow(now(), schedule);
+    const summaries = source === 'example'
+      ? exampleWeekSummaries(game)
+      : summarizeWeek(store.players(game).filter(player => player.enabled),
+        store.matchesDetectedBetween(game, window.start, Math.min(window.end, now())));
+    const report = renderWeeklyReport({ game, summaries, period: window.period, seed: window.key, config });
+    res.json({
+      game, source, period: window.period,
+      message: report?.message || null,
+      players: report?.players || [],
+      empty: !report,
+    });
+  });
+  app.post('/api/weekly/reports/:id/retry', (req, res) => {
+    const report = store.weeklyReport(req.params.id);
+    if (!report) fail(404, 'Resumo semanal não encontrado.');
+    if (report.status !== 'failed') fail(400, 'Somente resumos com falha podem ser reenviados.');
+    const updated = store.updateWeeklyReport(report.id, { status: 'pending', attempts: 0, error: null, nextAttemptAt: 0 });
+    monitor.refresh();
+    res.json({ report: publicWeeklyReport(updated) });
   });
 
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Rota não encontrada.')));

@@ -62,6 +62,13 @@ Lista criada em **06/11/2026**, a pedido do usuário. Os itens abaixo são suges
 - **Antes de implementar outro jogo:** revalidar a API, os modos atendidos, limites, credenciais e dados disponíveis; para futebol, confirmar a edição e o modo.
 - **Aceite:** adaptador separado, dados normalizados, templates compatíveis, deduplicação e testes offline, mantendo o projeto leve.
 
+## Possíveis evoluções do resumo semanal
+
+### M-010 — Frases do resumo semanal por jogo
+
+- **Situação:** o modelo e as frases do resumo semanal são compartilhados entre LoL e CS2 (`weekly_config`).
+- **Proposta:** permitir frases próprias por jogo, se o usuário quiser piadas específicas (PDL, Major etc.).
+
 ## Como manter esta lista
 
 Ao iniciar um item aprovado, registre responsável e escopo. Ao concluir, marque a entrega aqui e atualize a memória com o comportamento final, validação realizada e commit correspondente. Novos pedidos do usuário têm prioridade sobre a ordem sugerida.

@@ -38,6 +38,38 @@ const VALUE_LENGTH_BUDGETS = {
   hs: 10, data: 25, partida_id: 64,
 };
 
+// Frases padrão da primeira versão do CS2, só para atualizar quem nunca editou.
+const CS2_PHRASES_V1 = {
+  feed: [
+    'KKKKKKKKKKKKK {{nick}} FOI FIGURANTE EM {{mapa}}',
+    '{{deaths}} mortes? O inimigo já te chama de loja de conveniência, {{nick}}.',
+    '{{adr}} de ADR em {{mapa}}. Era pra ser dano ou cócegas? KKKKK',
+    '{{frag}} no {{modo}}. Vai treinar spray no deathmatch, {{nick}}.',
+    'O {{mapa}} agradece o buffet que {{nick}} serviu pro time inimigo.',
+    'KDA {{kda}}: o time jogou com um a menos e ainda deu pra ouvir você no chat KKKKK',
+    '{{nick}} entrou no bomb site só pra dar bom dia pro adversário.',
+    'Com {{adr}} de ADR até o bot do casual joga melhor KKKKK',
+  ],
+  normal: [
+    'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
+    'KDA {{kda}}: tá ok, {{nick}}. Fez a parte que era sua em {{mapa}}.',
+    '{{frag}} e {{adr}} de ADR. Serviço cumprido, sem faixa de MVP.',
+    'Nem herói, nem vilão. {{nick}} foi o figurante em {{mapa}}.',
+    'Placar {{placar}}. A resenha foi mais disputada que a partida KKKKK',
+    'Tá dentro do esperado. Mais uma na conta e segue o jogo.',
+  ],
+  carry: [
+    'JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK',
+    '{{frag}} em {{mapa}} foi bonito. A entrevista fica pra outra hora.',
+    'KDA {{kda}} e {{adr}} de ADR: pode comemorar, {{nick}}, mas sem discurso de campeão.',
+    'Hoje {{nick}} carregou de verdade. Repete amanhã pra gente acreditar.',
+    '{{kills}} abates e uma boa atuação. Calma que ainda não é o Major KKKKK',
+    'Mandou bem com {{frag}}. O grupo reconhece, mas não vai fazer estátua.',
+    '{{dano}} de dano em {{mapa}}. O time agradece e o adversário nem tanto.',
+    'Boa partida! Já pode ganhar um elogio e voltar pra fila.',
+  ],
+};
+
 const DEFAULT_CONFIG = {
   templates: [
     {
@@ -68,31 +100,48 @@ const DEFAULT_CONFIG = {
   phrases: {
     feed: [
       'KKKKKKKKKKKKK {{nick}} FOI FIGURANTE EM {{mapa}}',
-      '{{deaths}} mortes? O inimigo já te chama de loja de conveniência, {{nick}}.',
-      '{{adr}} de ADR em {{mapa}}. Era pra ser dano ou cócegas? KKKKK',
-      '{{frag}} no {{modo}}. Vai treinar spray no deathmatch, {{nick}}.',
+      '{{deaths}} mortes. O inimigo já chama {{nick}} de caixa eletrônico.',
+      '{{adr}} de ADR. Era pra causar dano ou fazer cosquinha?',
+      '{{frag}} no {{modo}}. Deathmatch existe pra isso, {{nick}}. Usa.',
       'O {{mapa}} agradece o buffet que {{nick}} serviu pro time inimigo.',
-      'KDA {{kda}}: o time jogou com um a menos e ainda deu pra ouvir você no chat KKKKK',
-      '{{nick}} entrou no bomb site só pra dar bom dia pro adversário.',
-      'Com {{adr}} de ADR até o bot do casual joga melhor KKKKK',
+      'KDA {{kda}}. O time jogou 4 contra 5 e ainda teve que te ouvir no chat.',
+      '{{nick}} entrou no bomb só pra dar bom dia pro adversário.',
+      'Com {{adr}} de ADR até bot do casual tem mais impacto.',
+      'Comprou arma pra quê? Era só dropar direto pro inimigo, {{nick}}.',
+      '{{deaths}} mortes em {{mapa}}. Tá treinando pra ser alvo de treino?',
+      'Mira no chão, cabeça no mundo da lua. {{frag}}.',
+      '{{nick}} rushou sozinho, morreu sozinho e vai chorar sozinho.',
+      'Esse {{frag}} merece ser apagado do histórico e da memória do grupo.',
+      'Seu mouse pediu demissão no meio da partida, {{nick}}?',
     ],
     normal: [
       'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
-      'KDA {{kda}}: tá ok, {{nick}}. Fez a parte que era sua em {{mapa}}.',
-      '{{frag}} e {{adr}} de ADR. Serviço cumprido, sem faixa de MVP.',
-      'Nem herói, nem vilão. {{nick}} foi o figurante em {{mapa}}.',
-      'Placar {{placar}}. A resenha foi mais disputada que a partida KKKKK',
-      'Tá dentro do esperado. Mais uma na conta e segue o jogo.',
+      'KDA {{kda}}. Nem fede nem cheira, {{nick}}.',
+      '{{frag}} e {{adr}} de ADR. Serviço de estagiário: fez, mas ninguém notou.',
+      'Nem herói, nem vilão. {{nick}} foi figurante em {{mapa}}.',
+      'Placar {{placar}}. A resenha foi mais disputada que a partida.',
+      'Jogou pro gasto. Igual café de padaria: ninguém reclama, ninguém elogia.',
+      '{{adr}} de ADR. Dano de quem fica escondido no fundo do bomb.',
+      'KDA {{kda}}: não atrapalhou. Esse é o elogio máximo que dá pra fazer.',
+      'Partida nota 5 em {{mapa}}. E nota 5 aqui é reprovação, {{nick}}.',
+      '{{nick}} trocou um por um a partida inteira. Isso é jogar ou contabilidade?',
+      'Esperou o time morrer primeiro pra pegar os frags? Esse {{frag}} entrega.',
+      '{{resultado}} em {{mapa}} e ninguém vai lembrar da sua participação.',
+      '{{hs}} de HS. Mirou no peito igual quem tem medo de acertar.',
     ],
     carry: [
-      'JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK',
-      '{{frag}} em {{mapa}} foi bonito. A entrevista fica pra outra hora.',
-      'KDA {{kda}} e {{adr}} de ADR: pode comemorar, {{nick}}, mas sem discurso de campeão.',
-      'Hoje {{nick}} carregou de verdade. Repete amanhã pra gente acreditar.',
-      '{{kills}} abates e uma boa atuação. Calma que ainda não é o Major KKKKK',
-      'Mandou bem com {{frag}}. O grupo reconhece, mas não vai fazer estátua.',
-      '{{dano}} de dano em {{mapa}}. O time agradece e o adversário nem tanto.',
-      'Boa partida! Já pode ganhar um elogio e voltar pra fila.',
+      'TÁ, FOI BEM. NÃO SE ACOSTUMA KKKKK',
+      '{{frag}} em {{mapa}}. Quem tava na conta, {{nick}}? Pode falar.',
+      'KDA {{kda}} e {{adr}} de ADR. Comemora rápido que amanhã volta ao normal.',
+      '{{kills}} abates e já tá se achando no Major. Desce, {{nick}}.',
+      'Boa partida. Guarda esse print, que vai demorar pra ter outro.',
+      '{{dano}} de dano em {{mapa}}. O adversário vai pedir revisão de demo.',
+      '{{nick}} jogou bem. Anota a data, que é evento raro.',
+      '{{mvps}} MVPs. Tá bom, toma um elogio, mas devolve amanhã.',
+      'O time inimigo devia estar de olho fechado pra deixar {{nick}} fazer {{frag}}.',
+      'Elogio liberado só hoje. Amanhã o grupo volta a te zoar, {{nick}}.',
+      '{{hs}} de HS. Suspeito. Alguém confere essa config aí.',
+      'Carregou hoje pra justificar as próximas dez derrotas.',
     ],
   },
 };
@@ -103,10 +152,13 @@ export function mapLabel(map) {
   return name ? name.replace(/\b\p{L}/gu, letter => letter.toUpperCase()) : 'Desconhecido';
 }
 
+/** Elogio na partida do CS2: KDA de pelo menos 3 e vitória. Derrota ou empate com KDA alto fica em obrigação. */
+export const CS2_PRAISE_MIN_KDA = 3;
 export function classifyCs2Performance(match) {
   const kda = calculateKda(match);
   if (kda < 1) return 'feed';
-  return kda < 2.5 ? 'normal' : 'carry';
+  const won = match.result === 'win' || (match.result === undefined && match.win === true);
+  return kda >= CS2_PRAISE_MIN_KDA && won ? 'carry' : 'normal';
 }
 
 function matchValues(match) {
@@ -152,11 +204,12 @@ export const CS2_MATCH_FIELDS = ['playerName', 'map', 'mode', 'kills', 'deaths',
 export const cs2Messages = createMessageEngine({
   game: 'cs2', variables: CS2_MESSAGE_VARIABLES, categories: CATEGORIES, budgets: VALUE_LENGTH_BUDGETS,
   defaults: DEFAULT_CONFIG, values: matchValues, classify: classifyCs2Performance, previewMatch,
+  previousPhrases: [CS2_PHRASES_V1],
   ui: {
     categories: [
       { key: 'feed', label: 'Zoeira', range: 'KDA < 1', band: 'feed' },
-      { key: 'normal', label: 'Obrigação', range: '1 ≤ KDA < 2,5', band: 'normal' },
-      { key: 'carry', label: 'Elogio', range: 'KDA ≥ 2,5', band: 'carry' },
+      { key: 'normal', label: 'Obrigação', range: 'KDA ≥ 1 sem elogio (KDA < 3, derrota ou empate)', band: 'normal' },
+      { key: 'carry', label: 'Elogio', range: 'KDA ≥ 3 e vitória', band: 'carry' },
     ],
     scenarios: [
       { key: 'feed', label: 'Zoeira · 8/17/3 · KDA 0,65' },

@@ -9,12 +9,13 @@
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
   <script src="/messages.js" defer></script>
+  <script src="/weekly.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="/" aria-label="GG Report início"><span class="brand-mark">gg<span>↗</span></span><span>GG <b>REPORT</b><small id="brand-subtitle">DO JOGO PRO GRUPO</small></span></a>
-      <div class="topbar-end"><span class="local-label"><span class="status-dot"></span>Seu servidor · local</span><a href="#mensagens" class="text-link">Mensagens <span aria-hidden="true">↗</span></a><a href="#setup" class="text-link">Configurações <span aria-hidden="true">↗</span></a></div>
+      <div class="topbar-end"><span class="local-label"><span class="status-dot"></span>Seu servidor · local</span><a href="#mensagens" class="text-link">Mensagens <span aria-hidden="true">↗</span></a><a href="#resumo-semanal" class="text-link">Resumo semanal <span aria-hidden="true">↗</span></a><a href="#setup" class="text-link">Configurações <span aria-hidden="true">↗</span></a></div>
     </header>
 
     <main>
@@ -137,7 +138,7 @@
                 <p id="message-template-help" class="studio-help">Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Modo: {{modo}}</code>. Use <code>{{zoeira}}</code> para incluir um comentário.</p>
                 <div id="message-used-variables" class="studio-used-variables" aria-label="Campos usados no texto"></div>
               </div>
-              <div class="studio-kda-policy" aria-labelledby="message-kda-title"><div class="studio-kda-policy-title"><h3 id="message-kda-title">A frase segue o KDA</h3><code>{{kda}}</code></div><p>(Abates + assistências) ÷ mortes. Sem mortes, divide por 1.</p><div class="studio-kda-bands" aria-label="Faixas de KDA"><span class="studio-kda-band" data-kda-band="feed"><strong>Abaixo de 1</strong><small>Zoeira</small></span><span class="studio-kda-band" data-kda-band="normal"><strong>1 até abaixo de 2,5</strong><small>Obrigação</small></span><span class="studio-kda-band" data-kda-band="carry"><strong>A partir de 2,5</strong><small>Elogio moderado</small></span></div><p id="studio-kda-note" class="studio-kda-policy-note">As assistências também contam para o suporte. As faixas usam o cálculo sem arredondar.</p></div>
+              <div class="studio-kda-policy" aria-labelledby="message-kda-title"><div class="studio-kda-policy-title"><h3 id="message-kda-title">A frase segue o KDA</h3><code>{{kda}}</code></div><p>(Abates + assistências) ÷ mortes. Sem mortes, divide por 1.</p><div class="studio-kda-bands" aria-label="Faixas de KDA"><span class="studio-kda-band" data-kda-band="feed"><strong>Abaixo de 1</strong><small>Zoeira</small></span><span class="studio-kda-band" data-kda-band="normal"><strong id="kda-band-normal">1 ou mais, sem elogio</strong><small>Obrigação</small></span><span class="studio-kda-band" data-kda-band="carry"><strong id="kda-band-carry">4 ou mais, com vitória</strong><small>Elogio raro</small></span></div><p id="studio-kda-note" class="studio-kda-policy-note">As assistências também contam para o suporte. As faixas usam o cálculo sem arredondar.</p></div>
               <details id="message-phrases-details" class="studio-phrases-details"><summary><span><span aria-hidden="true">✦</span> Personalizar as zoeiras<small>Frases que entram em {{zoeira}}</small></span><span id="message-phrase-count" class="count-label"></span></summary><div class="studio-block studio-phrases-block">
                 <label class="sr-only" for="message-phrases-text">Frases da categoria selecionada, uma por linha</label>
                 <div id="message-category-tabs" class="studio-category-tabs" role="group" aria-label="Tipo de desempenho"></div>
@@ -160,6 +161,50 @@
             </div>
           </div>
           <div class="studio-bottom"><p>Salvar vale para as próximas partidas detectadas neste jogo. Mensagens que já estão na fila mantêm o texto original.</p><button id="restore-message-defaults" type="button" class="text-link">Carregar modelos originais ↺</button></div>
+        </fieldset>
+      </section>
+      <section id="resumo-semanal" class="panel weekly-panel" aria-labelledby="weekly-title">
+        <div class="panel-header weekly-header">
+          <div><p id="weekly-eyebrow" class="eyebrow">05 / O BALANÇO DA SEMANA · LOL</p><h2 id="weekly-title">Resumo semanal</h2><p class="studio-intro">Uma mensagem por jogo com o ranking de vitórias e derrotas. Elogio só em caso raro.</p></div>
+          <div class="weekly-header-actions"><span id="weekly-save-state" class="badge badge-neutral" role="status">Carregando</span><label class="switch-label" for="weekly-toggle"><span id="weekly-toggle-label">Ativo</span><input id="weekly-toggle" type="checkbox" role="switch" disabled><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div id="weekly-load-error" class="studio-load-error" role="status" hidden><span>Não foi possível carregar o resumo semanal.</span><button id="weekly-retry-load" class="text-link" type="button">Tentar novamente ↻</button></div>
+        <fieldset id="weekly-fields" class="weekly-fields" disabled>
+          <legend class="sr-only">Configuração do resumo semanal</legend>
+          <div class="weekly-schedule">
+            <form id="weekly-schedule-form" class="weekly-schedule-form">
+              <div class="field"><label for="weekly-day">Dia do envio</label><select id="weekly-day"><option value="0">Domingo</option><option value="1">Segunda-feira</option><option value="2">Terça-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sábado</option></select></div>
+              <div class="field weekly-hour-field"><label for="weekly-hour">Horário</label><select id="weekly-hour"></select></div>
+              <button id="weekly-save-schedule" class="button button-outline" type="submit">Salvar horário</button>
+            </form>
+            <p id="weekly-next" class="weekly-next">—</p>
+          </div>
+          <div class="weekly-bands" aria-label="Faixas do resumo semanal" id="weekly-bands"></div>
+          <p class="weekly-note"><span aria-hidden="true">ⓘ</span> Conta as partidas que o monitor detectou na semana, de jogadores ativos. O envio acontece na primeira verificação depois do horário, com o monitor ativo; se o app estiver desligado, sai em até 24 horas. Semana sem partidas não envia nada. A taxa de vitória ignora empates.</p>
+          <div class="weekly-grid">
+            <div class="weekly-editor">
+              <div class="weekly-variables"><span class="count-label">Clique para inserir no campo selecionado:</span><div id="weekly-variable-list" class="weekly-variable-list"></div></div>
+              <div class="field"><label for="weekly-template">Mensagem completa <small>(precisa de <code>{{ranking}}</code>)</small></label><textarea id="weekly-template" class="weekly-input" rows="8" maxlength="3000" spellcheck="false"></textarea></div>
+              <div class="weekly-line-fields">
+                <div class="field"><label for="weekly-line">Linha de quem jogou (3+ partidas)</label><textarea id="weekly-line" class="weekly-input" rows="3" maxlength="500" spellcheck="false"></textarea></div>
+                <div class="field"><label for="weekly-inactive-line">Linha de quem sumiu (menos de 3)</label><textarea id="weekly-inactive-line" class="weekly-input" rows="3" maxlength="500" spellcheck="false"></textarea></div>
+              </div>
+              <div class="field">
+                <label for="weekly-phrases">Frases da faixa <small>(uma por linha, até 30)</small></label>
+                <div id="weekly-band-tabs" class="studio-category-tabs" role="group" aria-label="Faixa das frases"></div>
+                <p id="weekly-band-range" class="studio-category-range"></p>
+                <textarea id="weekly-phrases" class="weekly-input" rows="7" spellcheck="true"></textarea>
+              </div>
+              <div class="weekly-actions"><button id="weekly-restore" class="text-link" type="button">Carregar modelo original ↺</button><button id="weekly-save-config" class="button button-lime" type="button" disabled>Salvar resumo</button></div>
+            </div>
+            <div class="weekly-side">
+              <div class="field"><label for="weekly-preview-source">Dados da prévia</label><select id="weekly-preview-source"><option value="current">Semana em andamento (dados reais)</option><option value="last">Última semana encerrada (dados reais)</option><option value="example">Exemplo fictício</option></select></div>
+              <div class="message-preview weekly-preview"><div class="message-preview-top"><span class="status-dot"></span> GG Report <span id="weekly-preview-tag">PRÉVIA</span></div><pre id="weekly-preview" aria-live="polite">Carregando…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div>
+              <p id="weekly-preview-error" class="inline-error weekly-error" role="status" hidden></p>
+              <p class="preview-note"><span aria-hidden="true">◉</span> A prévia usa o rascunho e não envia ao WhatsApp.</p>
+              <div class="weekly-history"><div class="weekly-history-title"><h3>Resumos gerados</h3><button id="weekly-refresh" class="text-link" type="button">Atualizar ↻</button></div><div id="weekly-history-list" class="weekly-history-list"><p class="count-label">Nenhum resumo gerado ainda.</p></div></div>
+            </div>
+          </div>
         </fieldset>
       </section>
     </main>

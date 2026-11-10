@@ -33,7 +33,8 @@
   };
   const categoryLabel = key => session()?.categories.find(item => item.key === key)?.label || key;
   const bandLabels = { feed: 'Zoeira', normal: 'Não fez mais que a obrigação', carry: 'Elogio moderado' };
-  const bandRanges = { feed: 'KDA < 1', normal: '1 ≤ KDA < 2,5', carry: 'KDA ≥ 2,5' };
+  const praiseKda = () => (currentGame === 'cs2' ? '3' : '4');
+  const bandRangesFor = () => ({ feed: 'KDA < 1', normal: 'KDA ≥ 1 sem elogio', carry: `KDA ≥ ${praiseKda()} e vitória` });
 
   function showPerformance(result) {
     const band = result.performance?.band || (result.category === 'support' ? 'carry' : result.category);
@@ -41,7 +42,7 @@
       ? result.performance.kda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—');
     $('message-preview-kda').textContent = kda;
     $('message-preview-band').textContent = result.performance?.label || bandLabels[band] || 'Desempenho da partida';
-    $('message-preview-range').textContent = result.performance?.range || bandRanges[band] || '';
+    $('message-preview-range').textContent = result.performance?.range || bandRangesFor()[band] || '';
     $('message-preview-performance').dataset.band = band;
     for (const item of document.querySelectorAll('[data-kda-band]')) item.classList.toggle('active', item.dataset.kdaBand === band);
   }
@@ -111,9 +112,11 @@
     const note = $('studio-kda-note');
     if (note) {
       note.textContent = isCs2
-        ? 'As assistências entram na fórmula do KDA. As faixas usam o cálculo exato antes de arredondar.'
-        : 'As assistências também contam para o suporte. As faixas usam o cálculo sem arredondar.';
+        ? 'Elogio só com KDA 3 ou mais e vitória; derrota ou empate fica em obrigação. As faixas usam o cálculo exato antes de arredondar.'
+        : 'Elogio só com KDA 4 ou mais e vitória; derrota fica em obrigação. As assistências também contam para o suporte.';
     }
+    const carryBand = $('kda-band-carry');
+    if (carryBand) carryBand.textContent = `${praiseKda()} ou mais, com vitória`;
     $('message-template-help').innerHTML = isCs2
       ? 'Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Mapa: {{mapa}} ({{placar}})</code>. Use <code>{{zoeira}}</code> para incluir um comentário.'
       : 'Os campos entre <code>{{chaves}}</code> viram dados reais. Exemplo: <code>Modo: {{modo}}</code>. Use <code>{{zoeira}}</code> para incluir um comentário.';
@@ -272,7 +275,7 @@
     const phrases = active.draft.phrases[active.phraseCategory] || [];
     const category = active.categories.find(item => item.key === active.phraseCategory);
     const band = category?.band || (active.phraseCategory === 'support' ? 'carry' : active.phraseCategory);
-    $('message-category-range').textContent = `${category?.range || bandRanges[band] || ''}${active.phraseCategory === 'support' ? ' · Frases positivas próprias para quem jogou de suporte.' : ' · Frases usadas automaticamente nesta faixa.'}`;
+    $('message-category-range').textContent = `${category?.range || bandRangesFor()[band] || ''}${active.phraseCategory === 'support' ? ' · Frases positivas próprias para quem jogou de suporte.' : ' · Frases usadas automaticamente nesta faixa.'}`;
     $('message-phrases-text').value = phrases.join('\n');
     $('message-phrase-count').textContent = `${phrases.length} ${phrases.length === 1 ? 'frase' : 'frases'}`;
     cursors.set('message-phrases-text', { start: $('message-phrases-text').value.length, end: $('message-phrases-text').value.length });

@@ -84,6 +84,46 @@ const LEGACY_PHRASE_POOLS = {
     'Essa partida ficou na média. A resenha, infelizmente, não.',
   ],
 };
+// Frases padrão da versão das faixas de KDA, só para atualizar quem nunca editou.
+const LOL_PHRASES_KDA_V1 = {
+  feed: [
+    'KKKKKKKKKKKKK FEEDOU DEMAIS',
+    '{{nick}} abriu uma franquia de buffet na {{lane}} KKKKK',
+    '{{deaths}} mortes? O inimigo já salvou teu contato como patrocinador.',
+    'Foi de {{personagem}} ou de motoboy? Só entregou KKKKK',
+    'Esse {{frag}} veio com frete grátis pro time inimigo.',
+    'O respawn já está te chamando de cliente fiel, {{nick}}.',
+    'Jogou {{duracao}} e o destaque foi o caminho da base KKKKK',
+    'A {{lane}} virou rodízio e {{nick}} bancou a conta.',
+  ],
+  carry: [
+    'JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK',
+    '{{frag}} de {{personagem}} foi bonito. A entrevista fica pra outra hora.',
+    'KDA {{kda}}: pode comemorar, {{nick}}, mas sem discurso de campeão.',
+    'Hoje {{nick}} ajudou de verdade. Repete amanhã pra gente acreditar.',
+    'Boa partida! Já pode ganhar um elogio e voltar pra fila.',
+    '{{kills}} abates e uma boa atuação. Calma que ainda não é o mundial KKKKK',
+    'O {{personagem}} trabalhou bem hoje. Crédito onde é devido.',
+    'Mandou bem com {{frag}}. O grupo reconhece, mas não vai fazer estátua.',
+  ],
+  support: [
+    'BOM TRABALHO, SUP. ELOGIO LIBERADO, MAS SEM SE ACHAR KKKKK',
+    '{{assists}} assistências e KDA {{kda}}. Pode aceitar o obrigado, {{nick}}.',
+    '{{personagem}} ajudou o time de verdade. Hoje o sup merece crédito.',
+    '{{frag}} na SUP foi uma boa participação. A estátua ainda não vem.',
+    'Mandou bem no apoio, {{nick}}. Amanhã tem que repetir.',
+    'O grupo reconhece esse KDA {{kda}}. Só não vai pedir aumento KKKKK',
+  ],
+  normal: [
+    'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
+    'KDA {{kda}}: tá ok, {{nick}}. Fez a parte que era sua.',
+    '{{frag}} de {{personagem}}. Serviço cumprido, sem faixa de MVP.',
+    'Participou bem o suficiente. Pode guardar o discurso KKKKK',
+    'Fez o básico na {{lane}}. O grupo agradece sem fazer festa.',
+    'Tá dentro do esperado. Mais uma na conta e segue o jogo.',
+  ],
+};
+
 const DEFAULT_CONFIG = {
   templates: [
     {
@@ -115,39 +155,62 @@ const DEFAULT_CONFIG = {
   phrases: {
     feed: [
       'KKKKKKKKKKKKK FEEDOU DEMAIS',
-      '{{nick}} abriu uma franquia de buffet na {{lane}} KKKKK',
-      '{{deaths}} mortes? O inimigo já salvou teu contato como patrocinador.',
+      '{{deaths}} mortes. O inimigo já salvou {{nick}} nos contatos como patrocinador.',
       'Foi de {{personagem}} ou de motoboy? Só entregou KKKKK',
-      'Esse {{frag}} veio com frete grátis pro time inimigo.',
-      'O respawn já está te chamando de cliente fiel, {{nick}}.',
-      'Jogou {{duracao}} e o destaque foi o caminho da base KKKKK',
+      'Esse {{frag}} devia vir com aviso de conteúdo sensível.',
+      'O respawn já chama {{nick}} pelo nome.',
       'A {{lane}} virou rodízio e {{nick}} bancou a conta.',
+      '{{personagem}} merecia um jogador melhor. Qualquer um, na real.',
+      '{{duracao}} de partida e o maior feito de {{nick}} foi decorar o caminho da base.',
+      'Com {{deaths}} mortes, o time inimigo devia dividir o MVP com você, {{nick}}.',
+      'Desinstala o {{personagem}}. Aliás, desinstala o jogo, {{nick}}.',
+      'KDA {{kda}}. Até minion tem mais impacto no mapa.',
+      '{{nick}} não jogou de {{lane}}, jogou de ouro grátis pro adversário.',
+      'Tava com o monitor desligado ou foi talento mesmo, {{nick}}?',
+      'O {{personagem}} vai pedir troca de dono depois dessa.',
+      '{{frag}}. Seus aliados merecem indenização por danos morais.',
     ],
     carry: [
-      'JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK',
-      '{{frag}} de {{personagem}} foi bonito. A entrevista fica pra outra hora.',
-      'KDA {{kda}}: pode comemorar, {{nick}}, mas sem discurso de campeão.',
-      'Hoje {{nick}} ajudou de verdade. Repete amanhã pra gente acreditar.',
-      'Boa partida! Já pode ganhar um elogio e voltar pra fila.',
-      '{{kills}} abates e uma boa atuação. Calma que ainda não é o mundial KKKKK',
-      'O {{personagem}} trabalhou bem hoje. Crédito onde é devido.',
-      'Mandou bem com {{frag}}. O grupo reconhece, mas não vai fazer estátua.',
+      'TÁ, FOI BEM. NÃO SE ACOSTUMA KKKKK',
+      '{{frag}} de {{personagem}}. Quem tava na conta, {{nick}}? Pode falar.',
+      'KDA {{kda}}. Comemora rápido que amanhã volta ao normal.',
+      'Carregou hoje pra justificar as próximas dez derrotas.',
+      '{{kills}} abates e já tá se achando no mundial. Desce, {{nick}}.',
+      'Boa partida. Guarda esse print, que vai demorar pra ter outro.',
+      'Até que o {{personagem}} funcionou. Milagre registrado.',
+      '{{nick}} jogou bem. Anota a data, que é evento raro.',
+      '{{gold}} de gold e {{frag}}. Respeito, mas pouco.',
+      'O time inimigo devia estar muito ruim pra deixar {{nick}} fazer {{frag}}.',
+      'Elogio liberado só hoje. Amanhã o grupo volta a te zoar, {{nick}}.',
+      'Tá bom, {{nick}}, toma um elogio. Mas devolve amanhã.',
     ],
     support: [
-      'BOM TRABALHO, SUP. ELOGIO LIBERADO, MAS SEM SE ACHAR KKKKK',
-      '{{assists}} assistências e KDA {{kda}}. Pode aceitar o obrigado, {{nick}}.',
-      '{{personagem}} ajudou o time de verdade. Hoje o sup merece crédito.',
-      '{{frag}} na SUP foi uma boa participação. A estátua ainda não vem.',
-      'Mandou bem no apoio, {{nick}}. Amanhã tem que repetir.',
-      'O grupo reconhece esse KDA {{kda}}. Só não vai pedir aumento KKKKK',
+      'SUP CARREGOU E O ADC VAI DIZER QUE FOI ELE KKKKK',
+      '{{assists}} assistências e ninguém agradeceu. Vida de sup, {{nick}}.',
+      'Fez {{frag}} e ainda trocou a fralda do ADC. Respeito, mas sem exagero.',
+      'O time pegou os abates, {{personagem}} pegou o trabalho todo.',
+      'Se assistência pagasse aluguel, {{nick}} já tinha casa própria.',
+      'KDA {{kda}} de sup. Hoje passa, mas não vira hábito, {{nick}}.',
+      'Babá de luxo: {{assists}} assistências e paciência infinita.',
+      'Jogou de sup e ganhou. Agora tenta não deixar subir pra cabeça.',
+      '{{personagem}} segurou o time nas costas. A coluna não aguenta toda semana.',
+      'Sup bom é sup calado. Toma o elogio e volta pra ward, {{nick}}.',
     ],
     normal: [
       'NÃO FEZ MAIS QUE A OBRIGAÇÃO',
-      'KDA {{kda}}: tá ok, {{nick}}. Fez a parte que era sua.',
-      '{{frag}} de {{personagem}}. Serviço cumprido, sem faixa de MVP.',
-      'Participou bem o suficiente. Pode guardar o discurso KKKKK',
-      'Fez o básico na {{lane}}. O grupo agradece sem fazer festa.',
-      'Tá dentro do esperado. Mais uma na conta e segue o jogo.',
+      'KDA {{kda}}. Nem fede nem cheira, {{nick}}.',
+      '{{frag}} de {{personagem}}. Serviço de estagiário: fez, mas ninguém notou.',
+      'Nem herói, nem vilão. {{nick}} foi figurante na {{lane}}.',
+      '{{duracao}} de partida pra render esse print sem graça.',
+      'O {{personagem}} entrou, jogou e ninguém lembra. Cinema mudo.',
+      'Fez o básico na {{lane}}. Quer palmas pelo mínimo, {{nick}}?',
+      '{{farm}} de farm e {{frag}}. Número de quem joga no piloto automático.',
+      'Partida nota 5. E nota 5 aqui é reprovação, {{nick}}.',
+      'KDA {{kda}}: não atrapalhou. Esse é o elogio máximo que dá pra fazer.',
+      '{{resultado}} com {{frag}}. Até o placar ficou com preguiça de comentar.',
+      'Jogou pro gasto. Igual café de padaria: ninguém reclama, ninguém elogia.',
+      '{{nick}} passou pela {{lane}} igual vento: ninguém sentiu nada.',
+      'Bonitinho, mas ordinário. Próxima, {{nick}}.',
     ],
   },
 };
@@ -165,7 +228,7 @@ function assertKeys(value, expected, label) {
     throw new MessageConfigError(`${label} tem campos ausentes ou não permitidos.`);
   }
 }
-function validateText(text, { label, max, phrase = false }, allowedKeys = VARIABLE_KEYS) {
+export function validateText(text, { label, max, phrase = false }, allowedKeys = VARIABLE_KEYS) {
   if (typeof text !== 'string' || !text.trim() || text.length > max) {
     throw new MessageConfigError(`${label} deve ter entre 1 e ${max} caracteres.`);
   }
@@ -211,19 +274,21 @@ export function splitPlayerName(value) {
   return { player, nick: separator < 0 ? player : player.slice(0, separator), tag: separator < 0 ? '' : player.slice(separator + 1) };
 }
 
+/** Elogio na partida do LoL: KDA de pelo menos 4 e vitória. Derrota com KDA alto fica em obrigação. */
+export const LOL_PRAISE_MIN_KDA = 4;
 export function classifyPerformance(match) {
   const kda = calculateKda(match);
   if (kda < 1) return 'feed';
-  if (kda < 2.5) return 'normal';
+  if (kda < LOL_PRAISE_MIN_KDA || match.win !== true) return 'normal';
   return match.lane === 'SUP' ? 'support' : 'carry';
 }
 
-function selectIndex(seed, size) {
+export function selectIndex(seed, size) {
   let hash = 2166136261;
   for (let index = 0; index < seed.length; index++) hash = Math.imul(hash ^ seed.charCodeAt(index), 16777619);
   return (hash >>> 0) % size;
 }
-function render(text, values) {
+export function render(text, values) {
   // Substitute authored tokens once. Braces inside API values remain literal text.
   return text.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_token, key) => values[key]);
 }
@@ -263,7 +328,7 @@ function lolPreviewMatch(scenario) {
  * modelos padrão, valores da partida e prévias); validação, escolha determinística e renderização são comuns.
  */
 export function createMessageEngine(profile) {
-  const { game, variables, categories, budgets, defaults, values: valuesFor, classify, previewMatch, ui } = profile;
+  const { game, variables, categories, budgets, defaults, values: valuesFor, classify, previewMatch, ui, previousPhrases = [] } = profile;
   const keys = new Set(variables.map(variable => variable.key));
 
   function validateExpansionLengths(templates, phrases) {
@@ -348,18 +413,21 @@ export function createMessageEngine(profile) {
   return {
     game, variables, categories, ui, classify, validateConfig, formatMessage, createPreview,
     defaultConfig: () => structuredClone(defaults),
+    /** Versões antigas das frases padrão; só servem para atualizar categorias nunca editadas. */
+    previousPhrasePools: () => structuredClone(previousPhrases),
   };
 }
 
 const lolEngine = createMessageEngine({
   game: 'lol', variables: MESSAGE_VARIABLES, categories: CATEGORIES, budgets: VALUE_LENGTH_BUDGETS,
   defaults: DEFAULT_CONFIG, values: matchValues, classify: classifyPerformance, previewMatch: lolPreviewMatch,
+  previousPhrases: [LOL_PHRASES_KDA_V1, LEGACY_PHRASE_POOLS],
   ui: {
     categories: [
       { key: 'feed', label: 'Zoeira', range: 'KDA < 1', band: 'feed' },
-      { key: 'normal', label: 'Obrigação', range: '1 ≤ KDA < 2,5', band: 'normal' },
-      { key: 'carry', label: 'Elogio', range: 'KDA ≥ 2,5', band: 'carry' },
-      { key: 'support', label: 'Elogio ao suporte', range: 'KDA ≥ 2,5 · SUP', band: 'carry' },
+      { key: 'normal', label: 'Obrigação', range: 'KDA ≥ 1 sem elogio (KDA < 4 ou derrota)', band: 'normal' },
+      { key: 'carry', label: 'Elogio', range: 'KDA ≥ 4 e vitória', band: 'carry' },
+      { key: 'support', label: 'Elogio ao suporte', range: 'KDA ≥ 4 e vitória · SUP', band: 'carry' },
     ],
     scenarios: [
       { key: 'feed', label: 'Zoeira · 1/8/3 · KDA 0,50' },

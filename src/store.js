@@ -4,6 +4,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getDefaultMessageConfig, getLegacyPhrasePools, validateMessageConfig } from './message.js';
 import { GAME_IDS, messagesFor } from './games.js';
+import { getDefaultWeeklyConfig, isLegacyWeeklyConfig, validateWeeklyConfig } from './weekly.js';
+
+// Campos adicionados depois da primeira versão: instalações antigas recebem o padrão ao ler.
+const SETTINGS_DEFAULTS = { weeklyEnabled: true, weeklyDay: 0, weeklyHour: 21 };
 
 // Linhas antigas não têm `game` no JSON; a coluna adicionada pela migração é a fonte da verdade.
 const parse = row => ({ ...JSON.parse(row.payload), game: row.game });
@@ -36,7 +40,18 @@ export class Store {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS game_message_config (game TEXT PRIMARY KEY, payload TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS matches_by_game ON matches(game, ended_at);
+      CREATE TABLE IF NOT EXISTS weekly_config (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS weekly_reports (
+        id TEXT PRIMARY KEY, game TEXT NOT NULL, week_key TEXT NOT NULL,
+        status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL DEFAULT 0,
+        payload TEXT NOT NULL, UNIQUE(game, week_key)
+      );
     `);
+    this.db.prepare('INSERT OR IGNORE INTO weekly_config (id,payload) VALUES (1,?)').run(JSON.stringify(getDefaultWeeklyConfig()));
+    // Frases padrão antigas e nunca editadas recebem a versão atual; textos do usuário ficam intactos.
+    if (isLegacyWeeklyConfig(this.weeklyConfig())) {
+      this.db.prepare('UPDATE weekly_config SET payload=? WHERE id=1').run(JSON.stringify(getDefaultWeeklyConfig()));
+    }
     // O LoL segue na tabela message_config original; os demais jogos têm modelos próprios.
     for (const game of GAME_IDS.filter(id => id !== 'lol')) {
       this.db.prepare('INSERT OR IGNORE INTO game_message_config (game,payload) VALUES (?,?)')
@@ -85,6 +100,31 @@ export class Store {
       if (updated) this.updateMessageConfig({ ...current, phrases });
       this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('message-kda-bands-v1');
     }
+    // Frases mais ácidas (10/11/2026): só troca categorias idênticas a um padrão antigo, em cada jogo.
+    if (!this.db.prepare('SELECT 1 FROM app_migrations WHERE name=?').get('message-acid-phrases-v1')) {
+      for (const game of GAME_IDS) {
+        const engine = messagesFor(game);
+        const current = this.messageConfig(game);
+        const defaults = engine.defaultConfig();
+        const previous = engine.previousPhrasePools();
+        const phrases = { ...current.phrases };
+        let updated = false;
+        for (const category of Object.keys(defaults.phrases)) {
+          const pristine = previous.some(pools => JSON.stringify(pools[category]) === JSON.stringify(phrases[category]));
+          if (!pristine) continue;
+          const candidate = { ...phrases, [category]: defaults.phrases[category] };
+          try { engine.validateConfig({ ...current, phrases: candidate }); }
+          catch (error) {
+            if (error.name === 'MessageConfigError') continue;
+            throw error;
+          }
+          phrases[category] = defaults.phrases[category];
+          updated = true;
+        }
+        if (updated) this.updateMessageConfig({ ...current, phrases }, game);
+      }
+      this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('message-acid-phrases-v1');
+    }
   }
 
   messageConfig(game = 'lol') {
@@ -97,7 +137,9 @@ export class Store {
     else this.db.prepare('UPDATE message_config SET payload=? WHERE id=1').run(JSON.stringify(normalized));
     return normalized;
   }
-  settings() { return JSON.parse(this.db.prepare('SELECT payload FROM settings WHERE id=1').get().payload); }
+  settings() {
+    return { ...SETTINGS_DEFAULTS, ...JSON.parse(this.db.prepare('SELECT payload FROM settings WHERE id=1').get().payload) };
+  }
   updateSettings(patch) {
     const settings = { ...this.settings(), ...patch };
     this.db.prepare('UPDATE settings SET payload=? WHERE id=1').run(JSON.stringify(settings));
@@ -188,6 +230,53 @@ export class Store {
       sent: counts.sent || 0,
       pending: (counts.pending || 0) + (counts.failed || 0),
     };
+  }
+  /** Partidas detectadas (createdAt) no intervalo (start, end], para o resumo semanal. */
+  matchesDetectedBetween(game, start, end) {
+    return this.db.prepare(`SELECT game,payload FROM matches WHERE game=?
+      AND json_extract(payload,'$.createdAt') > ? AND json_extract(payload,'$.createdAt') <= ?`)
+      .all(game, new Date(start).toISOString(), new Date(end).toISOString()).map(parse);
+  }
+  weeklyConfig() { return JSON.parse(this.db.prepare('SELECT payload FROM weekly_config WHERE id=1').get().payload); }
+  updateWeeklyConfig(config) {
+    const normalized = validateWeeklyConfig(config);
+    this.db.prepare('UPDATE weekly_config SET payload=? WHERE id=1').run(JSON.stringify(normalized));
+    return normalized;
+  }
+  hasWeeklyReport(game, weekKey) {
+    return Boolean(this.db.prepare('SELECT 1 FROM weekly_reports WHERE game=? AND week_key=?').get(game, weekKey));
+  }
+  /** Registra o resumo da semana uma única vez por jogo; `message` nulo marca semana sem partidas. */
+  addWeeklyReport({ game, weekKey, period, start, end, message, groupId, players = [] }) {
+    const entry = {
+      id: randomUUID(), game, weekKey, period, start: new Date(start).toISOString(), end: new Date(end).toISOString(),
+      message, groupId, players, status: message ? 'pending' : 'skipped', attempts: 0, nextAttemptAt: 0,
+      error: null, sentAt: null, createdAt: new Date().toISOString(),
+    };
+    const result = this.db.prepare(`INSERT OR IGNORE INTO weekly_reports (id,game,week_key,status,payload)
+      VALUES (?,?,?,?,?)`).run(entry.id, game, weekKey, entry.status, JSON.stringify(entry));
+    return result.changes ? entry : null;
+  }
+  weeklyReports(limit = 10) {
+    return this.db.prepare('SELECT payload FROM weekly_reports ORDER BY week_key DESC, game ASC LIMIT ?')
+      .all(limit).map(row => JSON.parse(row.payload));
+  }
+  weeklyReport(id) {
+    const row = this.db.prepare('SELECT payload FROM weekly_reports WHERE id=?').get(id);
+    return row ? JSON.parse(row.payload) : null;
+  }
+  dueWeeklyReports(now = Date.now()) {
+    return this.db.prepare(`SELECT payload FROM weekly_reports WHERE status IN ('pending','failed')
+      AND attempts<5 AND next_attempt_at<=? ORDER BY week_key ASC, game ASC LIMIT 10`)
+      .all(now).map(row => JSON.parse(row.payload));
+  }
+  updateWeeklyReport(id, patch) {
+    const previous = this.weeklyReport(id);
+    if (!previous) return null;
+    const entry = { ...previous, ...patch };
+    this.db.prepare('UPDATE weekly_reports SET status=?,attempts=?,next_attempt_at=?,payload=? WHERE id=?')
+      .run(entry.status, entry.attempts, entry.nextAttemptAt, JSON.stringify(entry), id);
+    return entry;
   }
   close() { this.db.close(); }
 }

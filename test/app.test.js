@@ -99,6 +99,7 @@ test('changing an interval preserves the selected group and active monitoring', 
   assert.equal(result.status, 200);
   assert.deepEqual(result.data.settings, {
     pollIntervalSeconds: 60, monitoringEnabled: true, whatsappGroupId: groupId, whatsappGroupName: 'Tropa',
+    weeklyEnabled: true, weeklyDay: 0, weeklyHour: 21,
   });
   assert.equal(calls.groups, 0);
   assert.equal(calls.refresh, 1);

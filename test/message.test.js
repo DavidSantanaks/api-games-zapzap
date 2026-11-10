@@ -17,11 +17,13 @@ test('a KDA below one receives a feeder roast', () => {
 });
 
 test('support assistance contributes to the same KDA bands before its positive phrase subgroup', () => {
-  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 20 }), 'support');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 20, win: true }), 'support');
   assert.equal(createPreview('support').category, 'support');
-  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 9 }), 'normal');
-  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 8, assists: 3 }), 'feed');
-  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 12 }), 'support');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 9, win: true }), 'normal');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 8, assists: 3, win: true }), 'feed');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 19, win: true }), 'support');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 18, win: true }), 'normal');
+  assert.equal(classifyPerformance({ lane: 'SUP', kills: 1, deaths: 5, assists: 20, win: false }), 'normal', 'derrota não ganha elogio');
 });
 
 test('moderate performance receives obligation and higher KDA receives restrained praise', () => {
@@ -30,23 +32,24 @@ test('moderate performance receives obligation and higher KDA receives restraine
   assert.equal(normal.values.kda, '2,00');
   assert.equal(normal.category, 'normal');
   assert.ok(normal.message.endsWith('NÃO FEZ MAIS QUE A OBRIGAÇÃO'));
-  assert.ok(createPreview('carry').message.endsWith('JOGOU BEM, MAS SEGURA A EMOÇÃO KKKKK'));
-  assert.equal(classifyPerformance({ kills: 7, deaths: 0, assists: 2, lane: 'MID' }), 'carry');
+  assert.ok(createPreview('carry').message.endsWith('TÁ, FOI BEM. NÃO SE ACOSTUMA KKKKK'));
+  assert.equal(classifyPerformance({ kills: 7, deaths: 0, assists: 2, lane: 'MID', win: true }), 'carry');
+  assert.equal(classifyPerformance({ kills: 7, deaths: 0, assists: 2, lane: 'MID', win: false }), 'normal');
   assert.equal(classifyPerformance({ kills: 0, deaths: 0, assists: 0 }), 'feed');
 });
 
 test('KDA thresholds have no gaps and compare the full numeric ratio', () => {
   for (const [kills, deaths, expectedKda, category] of [
     [99, 100, 0.99, 'feed'], [1, 1, 1, 'normal'], [149, 100, 1.49, 'normal'],
-    [3, 2, 1.5, 'normal'], [2, 1, 2, 'normal'], [249, 100, 2.49, 'normal'],
-    [5, 2, 2.5, 'carry'], [251, 100, 2.51, 'carry'],
+    [3, 2, 1.5, 'normal'], [2, 1, 2, 'normal'], [5, 2, 2.5, 'normal'], [399, 100, 3.99, 'normal'],
+    [4, 1, 4, 'carry'], [401, 100, 4.01, 'carry'],
   ]) {
-    const match = Object.freeze({ kills, deaths, assists: 0, lane: 'MID' });
+    const match = Object.freeze({ kills, deaths, assists: 0, lane: 'MID', win: true });
     assert.equal(calculateKda(match), expectedKda);
     assert.equal(classifyPerformance(match), category, String(expectedKda));
   }
-  const roundsToUpperBand = { kills: 499, deaths: 200, assists: 0, lane: 'MID' };
-  assert.equal(formatMessage(roundsToUpperBand).values.kda, '2,50');
+  const roundsToUpperBand = { kills: 799, deaths: 200, assists: 0, lane: 'MID', win: true };
+  assert.equal(formatMessage(roundsToUpperBand).values.kda, '4,00');
   assert.equal(classifyPerformance(roundsToUpperBand), 'normal');
   assert.equal(classifyPerformance({ kills: 199, deaths: 200, assists: 0 }), 'feed');
 });
@@ -91,11 +94,11 @@ test('preview scenarios have isolated demonstration identifiers and reject unkno
   assert.throws(() => createPreview('__proto__'), /Escolha uma prévia/);
 });
 
-test('defaults provide three editable presets and 28 phrases without leaking shared state', () => {
+test('defaults provide three editable presets and 51 phrases without leaking shared state', () => {
   const original = getDefaultMessageConfig();
   assert.equal(original.templates.length, 3);
   assert.equal(original.templates.filter(template => template.enabled).length, 1);
-  assert.deepEqual(Object.values(original.phrases).map(pool => pool.length), [8, 8, 6, 6]);
+  assert.deepEqual(Object.values(original.phrases).map(pool => pool.length), [15, 12, 10, 14]);
   const copy = getDefaultMessageConfig();
   copy.templates[0].text = 'Alterado';
   copy.phrases.feed.splice(0);
@@ -180,7 +183,7 @@ test('preview can explicitly select a disabled template and every preset renders
     }
   }
   assert.throws(() => createPreview('feed', { config, templateId: 'missing' }), MessageConfigError);
-  for (const phraseIndex of [-1, 8, 0.5, '0', null]) {
+  for (const phraseIndex of [-1, 15, 0.5, '0', null]) {
     assert.throws(() => createPreview('feed', { config, phraseIndex }), MessageConfigError);
   }
 });

@@ -32,8 +32,10 @@ test('CS2 preview scenarios cover feed, normal and carry KDA bands with map, sco
 test('CS2 KDA classification uses exact unrounded boundaries and supports draws and missing ADR', () => {
   assert.equal(classifyCs2Performance({ kills: 9, deaths: 10, assists: 0 }), 'feed');
   assert.equal(classifyCs2Performance({ kills: 10, deaths: 10, assists: 0 }), 'normal');
-  assert.equal(classifyCs2Performance({ kills: 24, deaths: 10, assists: 0 }), 'normal');
-  assert.equal(classifyCs2Performance({ kills: 25, deaths: 10, assists: 0 }), 'carry');
+  assert.equal(classifyCs2Performance({ kills: 29, deaths: 10, assists: 0, result: 'win' }), 'normal');
+  assert.equal(classifyCs2Performance({ kills: 30, deaths: 10, assists: 0, result: 'win' }), 'carry');
+  assert.equal(classifyCs2Performance({ kills: 30, deaths: 10, assists: 0, result: 'loss' }), 'normal', 'derrota não ganha elogio');
+  assert.equal(classifyCs2Performance({ kills: 30, deaths: 10, assists: 0, result: 'draw' }), 'normal', 'empate não ganha elogio');
 
   const drawMatch = {
     id: 'CSGO-ruwBY-a8nzc-sf75U-PFq6w-GWRZQ',
