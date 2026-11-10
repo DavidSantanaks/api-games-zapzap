@@ -108,7 +108,7 @@
   function renderGameChrome() {
     const isCs2 = currentGame === 'cs2';
     const eyebrow = $('studio-eyebrow');
-    if (eyebrow) eyebrow.textContent = isCs2 ? '04 / VOCÊ ESCREVE A RESENHA · CS2' : '04 / VOCÊ ESCREVE A RESENHA · LOL';
+    if (eyebrow) eyebrow.textContent = isCs2 ? 'VOCÊ ESCREVE A RESENHA · CS2' : 'VOCÊ ESCREVE A RESENHA · LOL';
     const note = $('studio-kda-note');
     if (note) {
       note.textContent = isCs2
@@ -634,10 +634,14 @@
     $('expand-message-editor').title = enabled ? 'Sair do modo ampliado (Esc)' : 'Ampliar o editor';
     $('expand-message-label').textContent = enabled ? 'Fechar' : 'Ampliar';
     if (enabled) {
+      // Everything in the shell outside the studio becomes inert, at every nesting level.
       const shell = document.querySelector('.app-shell');
-      for (const child of shell.children) {
-        const siblings = child.tagName === 'MAIN' ? [...child.children].filter(element => element !== $('mensagens')) : [child];
-        for (const sibling of siblings) { inertStates.set(sibling, Boolean(sibling.inert)); sibling.inert = true; }
+      for (let node = $('mensagens'); node && node !== shell; node = node.parentElement) {
+        for (const sibling of node.parentElement.children) {
+          if (sibling === node || inertStates.has(sibling)) continue;
+          inertStates.set(sibling, Boolean(sibling.inert));
+          sibling.inert = true;
+        }
       }
     } else {
       for (const [element, previous] of inertStates) element.inert = previous;

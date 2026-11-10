@@ -3,35 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111412">
+  <meta name="theme-color" content="#120f18">
   <meta name="description" content="Acompanhe partidas de League of Legends e Counter-Strike 2 e leve o placar para a resenha do WhatsApp.">
   <title>GG Report · Central da resenha</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
   <script src="/messages.js" defer></script>
   <script src="/weekly.js" defer></script>
+  <script src="/nav.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="GG Report início"><span class="brand-mark">gg<span>↗</span></span><span>GG <b>REPORT</b><small id="brand-subtitle">DO JOGO PRO GRUPO</small></span></a>
-      <div class="topbar-end"><span class="local-label"><span class="status-dot"></span>Seu servidor · local</span><a href="#mensagens" class="text-link">Mensagens <span aria-hidden="true">↗</span></a><a href="#resumo-semanal" class="text-link">Resumo semanal <span aria-hidden="true">↗</span></a><a href="#setup" class="text-link">Configurações <span aria-hidden="true">↗</span></a></div>
-    </header>
-
-    <main>
-      <div id="connection-alert" class="connection-alert" role="status" hidden>Não foi possível atualizar o painel. Tentando reconectar…</div>
+    <aside class="sidebar" aria-label="Navegação principal">
+      <a class="brand" href="#painel" aria-label="GG Report início"><span class="brand-mark">gg</span><span class="brand-copy">GG <b>REPORT</b><small id="brand-subtitle">DO JOGO PRO GRUPO</small></span></a>
 
       <nav class="game-tabs" aria-label="Selecionar jogo">
         <button class="game-tab active" data-game-tab="lol" type="button" aria-pressed="true">
-          <span class="game-tab-badge">MOBA</span>
+          <span class="game-tab-badge">LoL</span>
           <span class="game-tab-copy"><strong>League of Legends</strong><small>Ranqueadas, Normal e ARAM</small></span>
         </button>
         <button class="game-tab" data-game-tab="cs2" type="button" aria-pressed="false">
-          <span class="game-tab-badge">FPS</span>
+          <span class="game-tab-badge">CS2</span>
           <span class="game-tab-copy"><strong>Counter-Strike 2</strong><small>Premier e Competitivo</small></span>
         </button>
       </nav>
 
+      <nav class="view-nav" aria-label="Seções">
+        <a class="view-link" href="#painel" data-view-link="painel"><span class="view-icon" aria-hidden="true">◫</span><span>Painel</span></a>
+        <a class="view-link" href="#players" data-view-link="players"><span class="view-icon" aria-hidden="true">◎</span><span>Players</span></a>
+        <a class="view-link" href="#mensagens" data-view-link="mensagens"><span class="view-icon" aria-hidden="true">✎</span><span>Mensagens</span></a>
+        <a class="view-link" href="#resumo-semanal" data-view-link="resumo-semanal"><span class="view-icon" aria-hidden="true">▦</span><span>Resumo semanal</span></a>
+        <a class="view-link" href="#whatsapp" data-view-link="whatsapp"><span class="view-icon" aria-hidden="true">✆</span><span>WhatsApp</span></a>
+      </nav>
+
+      <div class="sidebar-status" aria-label="Status">
+        <a class="nav-status" href="#painel"><span>Monitor</span><span id="nav-monitor-status" class="nav-status-value">—</span></a>
+        <a class="nav-status" href="#whatsapp"><span>WhatsApp</span><span id="nav-whatsapp-status" class="nav-status-value">—</span></a>
+        <p class="sidebar-foot"><span class="status-dot"></span>Seu servidor · local</p>
+      </div>
+    </aside>
+
+    <main>
+      <div id="connection-alert" class="connection-alert" role="status" hidden>Não foi possível atualizar o painel. Tentando reconectar…</div>
+      <div id="riot-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta a chave da Riot.</strong> Preencha <code>RIOT_API_KEY</code> no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. Você já pode experimentar as prévias.</p><a href="https://developer.riotgames.com/" target="_blank" rel="noreferrer">Obter chave ↗</a></div>
+      <div id="cs2-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta configurar a chave do CS2.</strong> Preencha <code>STEAM_API_KEY</code> (e opcionalmente <code>LEETIFY_API_KEY</code>) no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. As prévias já funcionam.</p><a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer">Chave Steam ↗</a></div>
+
+      <div class="view" data-view="painel">
       <section class="page-intro" aria-labelledby="page-title">
         <div><p class="eyebrow"><span class="tiny-square"></span> <span id="active-game-eyebrow">LEAGUE OF LEGENDS</span></p><h1 id="page-title">Central da resenha<span>.</span></h1><p id="intro-copy" class="intro-copy">O placar é sério. O comentário, nem tanto.</p></div>
         <button id="check-now" class="button button-outline" type="button"><span aria-hidden="true">↻</span> Verificar agora</button>
@@ -48,14 +65,34 @@
         <div class="monitor-description"><span id="monitor-icon" class="monitor-symbol" aria-hidden="true">◉</span><div><h2 id="monitor-title">Monitor de partidas <span id="monitor-badge" class="badge badge-neutral">Carregando</span></h2><p id="monitor-detail">Buscando o status do monitor…</p></div></div>
         <div class="monitor-controls"><form id="interval-form" class="interval-form"><label for="poll-interval">Verificar a cada</label><div class="interval-input"><input id="poll-interval" name="pollIntervalSeconds" type="number" min="30" max="86400" step="1" value="120" required aria-label="Intervalo em segundos"><span>seg</span></div><button id="save-interval" type="submit" class="icon-button" title="Salvar intervalo" aria-label="Salvar intervalo">✓</button></form><div class="control-divider"></div><label class="switch-label" for="monitor-toggle"><span id="toggle-label">Ativar</span><input id="monitor-toggle" type="checkbox" role="switch"><span class="switch-track" aria-hidden="true"></span></label></div>
       </section>
-      <div id="riot-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta a chave da Riot.</strong> Preencha <code>RIOT_API_KEY</code> no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. Você já pode experimentar as prévias abaixo.</p><a href="https://developer.riotgames.com/" target="_blank" rel="noreferrer">Obter chave ↗</a></div>
-      <div id="cs2-notice" class="setup-notice" hidden><span aria-hidden="true">ⓘ</span><p><strong>Falta configurar a chave do CS2.</strong> Preencha <code>STEAM_API_KEY</code> (e opcionalmente <code>LEETIFY_API_KEY</code>) no arquivo <code>.env</code>. No Docker, aplique com <code>docker compose up -d --force-recreate</code>; na execução local, reinicie o app. As prévias abaixo já funcionam.</p><a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer">Chave Steam ↗</a></div>
       <p id="monitor-error" class="inline-error monitor-error" role="status" hidden></p>
 
       <div class="workspace-grid">
         <div class="main-column">
+
+          <section class="panel history-panel" aria-labelledby="history-title">
+            <div class="panel-header"><div><p class="eyebrow">O PLACAR NÃO MENTE</p><h2 id="history-title">Últimas partidas</h2></div><span id="history-count" class="count-label">0 partidas</span></div>
+            <div class="history-toolbar" role="group" aria-label="Filtrar partidas"><button class="filter-tab active" data-filter="all" type="button" aria-pressed="true">Todas</button><button class="filter-tab" data-filter="sent" type="button" aria-pressed="false">Enviadas</button><button class="filter-tab" data-filter="pending" type="button" aria-pressed="false">Na fila</button><button class="filter-tab" data-filter="failed" type="button" aria-pressed="false">Com erro</button></div>
+            <div id="matches-list" class="matches-list" aria-live="polite"><div class="empty-state"><span class="empty-symbol" aria-hidden="true">▤</span><h3>A próxima partida já tem plateia.</h3><p>Cadastre um player e ative o monitor.<br>As novas partidas aparecem aqui.</p></div></div>
+          </section>
+        </div>
+
+        <aside class="side-column">
+
+          <section class="panel preview-panel" aria-labelledby="preview-title">
+            <div class="panel-header"><div><p class="eyebrow">TEST DRIVE</p><h2 id="preview-title">Amostra das mensagens</h2></div><span class="badge badge-neutral">Prévia</span></div>
+            <div class="preview-tabs" role="group" aria-label="Escolher exemplo por KDA"><button class="preview-tab active" data-scenario="feed" type="button" aria-pressed="true">Zoeira</button><button class="preview-tab" data-scenario="normal" type="button" aria-pressed="false">Obrigação</button><button class="preview-tab" data-scenario="carry" type="button" aria-pressed="false">Elogio</button><button id="preview-support-tab" class="preview-tab" data-scenario="support" type="button" aria-pressed="false">Suporte</button></div>
+            <p id="preview-kda-summary" class="preview-kda-summary" role="status">Calculando o KDA do exemplo…</p>
+            <div class="message-preview"><div class="message-preview-top"><span class="status-dot"></span> GG Report <span id="preview-game-tag">EXEMPLO</span></div><pre id="preview-message">Carregando exemplo…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div>
+            <p class="preview-note"><span aria-hidden="true">◉</span> Só uma simulação. Não envia ao WhatsApp.</p>
+          </section>
+        </aside>
+      </div>
+      </div>
+
+      <div class="view" data-view="players">
           <section class="panel players-panel" aria-labelledby="players-title">
-            <div class="panel-header"><div><p class="eyebrow">01 / QUEM VAI PRO PRINT</p><h2 id="players-title">Players monitorados</h2></div><span class="section-icon" aria-hidden="true">◎</span></div>
+            <div class="panel-header"><div><p class="eyebrow">QUEM VAI PRO PRINT</p><h2 id="players-title">Players monitorados</h2></div><span class="section-icon" aria-hidden="true">◎</span></div>
             <form id="player-form" class="player-form">
               <div id="lol-player-fields">
                 <div class="riot-id-fields"><div class="field"><label for="game-name">Nome do player</label><input id="game-name" name="gameName" placeholder="Nick do invocador" maxlength="40" autocomplete="off" required></div><span class="riot-hash" aria-hidden="true">#</span><div class="field tag-field"><label for="tag-line">Tag</label><input id="tag-line" name="tagLine" placeholder="BR1" maxlength="10" autocomplete="off" required></div></div>
@@ -86,17 +123,11 @@
             <div id="players-list" class="players-list" aria-live="polite"><div class="empty-state compact"><span class="empty-symbol" aria-hidden="true">◎</span><p>Carregando players…</p></div></div>
             <div id="players-footnote" class="panel-footnote"><span aria-hidden="true">↳</span> <span id="players-footnote-text">Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.</span></div>
           </section>
+      </div>
 
-          <section class="panel history-panel" aria-labelledby="history-title">
-            <div class="panel-header"><div><p class="eyebrow">02 / O PLACAR NÃO MENTE</p><h2 id="history-title">Últimas partidas</h2></div><span id="history-count" class="count-label">0 partidas</span></div>
-            <div class="history-toolbar" role="group" aria-label="Filtrar partidas"><button class="filter-tab active" data-filter="all" type="button" aria-pressed="true">Todas</button><button class="filter-tab" data-filter="sent" type="button" aria-pressed="false">Enviadas</button><button class="filter-tab" data-filter="pending" type="button" aria-pressed="false">Na fila</button><button class="filter-tab" data-filter="failed" type="button" aria-pressed="false">Com erro</button></div>
-            <div id="matches-list" class="matches-list" aria-live="polite"><div class="empty-state"><span class="empty-symbol" aria-hidden="true">▤</span><h3>A próxima partida já tem plateia.</h3><p>Cadastre um player e ative o monitor.<br>As novas partidas aparecem aqui.</p></div></div>
-          </section>
-        </div>
-
-        <aside class="side-column">
+      <div class="view" data-view="whatsapp">
           <section class="panel whatsapp-panel" aria-labelledby="whatsapp-title">
-            <div class="panel-header"><div><p class="eyebrow">03 / DESTINO DA RESENHA</p><h2 id="whatsapp-title">WhatsApp</h2></div><span id="whatsapp-badge" class="badge badge-neutral">Desconectado</span></div>
+            <div class="panel-header"><div><p class="eyebrow">DESTINO DA RESENHA</p><h2 id="whatsapp-title">WhatsApp</h2></div><span id="whatsapp-badge" class="badge badge-neutral">Desconectado</span></div>
             <div id="whatsapp-offline" class="whatsapp-offline"><div class="whatsapp-illustration" aria-hidden="true"><span>↗</span><i></i><i></i><i></i></div><h3>O grupo merece saber.</h3><p>Conecte sua conta e escolha onde os placares vão chegar.</p></div>
             <div id="qr-container" class="qr-container" hidden><img id="whatsapp-qr" alt="QR Code para conectar o WhatsApp" width="220" height="220"><p>No celular: <strong>WhatsApp → Aparelhos conectados → Conectar aparelho.</strong></p><small>O QR Code atualiza automaticamente.</small></div>
             <div id="whatsapp-connected" class="whatsapp-connected" hidden><span class="connected-icon" aria-hidden="true">✓</span><div><strong>Conta conectada</strong><small id="whatsapp-phone"></small></div></div>
@@ -106,18 +137,11 @@
             <button id="disconnect-whatsapp" class="text-link disconnect-link" type="button" hidden>Desconectar conta</button>
             <div class="integration-note">Conexão compartilhada entre LoL e CS2 via WhatsApp Web (Baileys, não oficial). Os envios automáticos começam com o monitor ativo.</div>
           </section>
-
-          <section class="panel preview-panel" aria-labelledby="preview-title">
-            <div class="panel-header"><div><p class="eyebrow">TEST DRIVE</p><h2 id="preview-title">Amostra das mensagens</h2></div><span class="badge badge-neutral">Prévia</span></div>
-            <div class="preview-tabs" role="group" aria-label="Escolher exemplo por KDA"><button class="preview-tab active" data-scenario="feed" type="button" aria-pressed="true">Zoeira</button><button class="preview-tab" data-scenario="normal" type="button" aria-pressed="false">Obrigação</button><button class="preview-tab" data-scenario="carry" type="button" aria-pressed="false">Elogio</button><button id="preview-support-tab" class="preview-tab" data-scenario="support" type="button" aria-pressed="false">Suporte</button></div>
-            <p id="preview-kda-summary" class="preview-kda-summary" role="status">Calculando o KDA do exemplo…</p>
-            <div class="message-preview"><div class="message-preview-top"><span class="status-dot"></span> GG Report <span id="preview-game-tag">EXEMPLO</span></div><pre id="preview-message">Carregando exemplo…</pre><div class="message-ticks" aria-hidden="true">✓✓</div></div>
-            <p class="preview-note"><span aria-hidden="true">◉</span> Só uma simulação. Não envia ao WhatsApp.</p>
-          </section>
-        </aside>
       </div>
+
+      <div class="view" data-view="mensagens">
       <section id="mensagens" class="panel message-studio" aria-labelledby="studio-title">
-        <div class="panel-header studio-header"><div><p id="studio-eyebrow" class="eyebrow">04 / VOCÊ ESCREVE A RESENHA · LOL</p><h2 id="studio-title">Sua mensagem, do seu jeito.</h2><p class="studio-intro">Escolha os dados, monte o texto e veja como ele vai chegar ao grupo.</p></div><div class="studio-header-actions"><span id="message-save-state" class="badge badge-neutral" role="status">Carregando</span><button id="expand-message-editor" class="button button-outline studio-expand-button" type="button" aria-pressed="false" title="Ampliar o editor"><span aria-hidden="true">⤢</span><span id="expand-message-label">Ampliar</span></button><button id="save-messages" class="button button-lime" type="button" disabled>Salvar mensagens</button></div></div>
+        <div class="panel-header studio-header"><div><p id="studio-eyebrow" class="eyebrow">VOCÊ ESCREVE A RESENHA · LOL</p><h2 id="studio-title">Sua mensagem, do seu jeito.</h2><p class="studio-intro">Escolha os dados, monte o texto e veja como ele vai chegar ao grupo.</p></div><div class="studio-header-actions"><span id="message-save-state" class="badge badge-neutral" role="status">Carregando</span><button id="expand-message-editor" class="button button-outline studio-expand-button" type="button" aria-pressed="false" title="Ampliar o editor"><span aria-hidden="true">⤢</span><span id="expand-message-label">Ampliar</span></button><button id="save-messages" class="button button-lime" type="button" disabled>Salvar mensagens</button></div></div>
         <div id="message-load-error" class="studio-load-error" role="status" hidden><span>Não foi possível carregar suas mensagens.</span><button id="retry-message-load" class="text-link" type="button">Tentar novamente ↻</button></div>
         <fieldset id="message-editor-fields" class="studio-fields" disabled>
           <legend class="sr-only">Editor de mensagens e prévia</legend>
@@ -163,9 +187,12 @@
           <div class="studio-bottom"><p>Salvar vale para as próximas partidas detectadas neste jogo. Mensagens que já estão na fila mantêm o texto original.</p><button id="restore-message-defaults" type="button" class="text-link">Carregar modelos originais ↺</button></div>
         </fieldset>
       </section>
+      </div>
+
+      <div class="view" data-view="resumo-semanal">
       <section id="resumo-semanal" class="panel weekly-panel" aria-labelledby="weekly-title">
         <div class="panel-header weekly-header">
-          <div><p id="weekly-eyebrow" class="eyebrow">05 / O BALANÇO DA SEMANA · LOL</p><h2 id="weekly-title">Resumo semanal</h2><p class="studio-intro">Uma mensagem por jogo com o ranking de vitórias e derrotas. Elogio só em caso raro.</p></div>
+          <div><p id="weekly-eyebrow" class="eyebrow">O BALANÇO DA SEMANA · LOL</p><h2 id="weekly-title">Resumo semanal</h2><p class="studio-intro">Uma mensagem por jogo com o ranking de vitórias e derrotas. Elogio só em caso raro.</p></div>
           <div class="weekly-header-actions"><span id="weekly-save-state" class="badge badge-neutral" role="status">Carregando</span><label class="switch-label" for="weekly-toggle"><span id="weekly-toggle-label">Ativo</span><input id="weekly-toggle" type="checkbox" role="switch" disabled><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div id="weekly-load-error" class="studio-load-error" role="status" hidden><span>Não foi possível carregar o resumo semanal.</span><button id="weekly-retry-load" class="text-link" type="button">Tentar novamente ↻</button></div>
@@ -207,9 +234,11 @@
           </div>
         </fieldset>
       </section>
+      </div>
+
+      <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span><a id="footer-leetify" class="text-link footer-credit" href="https://leetify.com/" target="_blank" rel="noreferrer">Data Provided by Leetify ↗</a></div><p>GG Report is not endorsed by Riot Games, Valve Corporation, or Leetify. Riot Games, League of Legends, Counter-Strike, Steam, and associated properties are trademarks or registered trademarks of their respective owners.</p></footer>
     </main>
 
-    <footer><div><span class="footer-brand">GG REPORT</span><span>Feito para o pós-game.</span><a id="footer-leetify" class="text-link footer-credit" href="https://leetify.com/" target="_blank" rel="noreferrer">Data Provided by Leetify ↗</a></div><p>GG Report is not endorsed by Riot Games, Valve Corporation, or Leetify. Riot Games, League of Legends, Counter-Strike, Steam, and associated properties are trademarks or registered trademarks of their respective owners.</p></footer>
   </div>
 
   <dialog id="message-dialog">

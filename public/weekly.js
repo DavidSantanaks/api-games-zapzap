@@ -207,7 +207,7 @@
 
   function setGame(value) {
     game = value === 'cs2' ? 'cs2' : 'lol';
-    $('weekly-eyebrow').textContent = `05 / O BALANÇO DA SEMANA · ${gameLabel(game)}`;
+    $('weekly-eyebrow').textContent = `O BALANÇO DA SEMANA · ${gameLabel(game)}`;
     schedulePreview();
   }
 
