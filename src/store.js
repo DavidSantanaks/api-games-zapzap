@@ -161,7 +161,8 @@ export class Store {
       createdAt: new Date().toISOString(), lastSeenMatchId,
       lastCheckedAt: null, lastError: null,
     };
-    const identity = game === 'lol' ? `${region}:${account.puuid}` : `${game}:${account.steamId}`;
+    const identity = game === 'lol' ? `${region}:${account.puuid}`
+      : game === 'r6' ? `r6:${account.profileId}` : `${game}:${account.steamId}`;
     this.db.prepare('INSERT INTO players (id,game,identity,payload) VALUES (?,?,?,?)')
       .run(player.id, game, identity, JSON.stringify(player));
     return player;

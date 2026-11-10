@@ -4,11 +4,12 @@ import { GAME_IDS, messagesFor } from './games.js';
 import { dueWeeklyWindow, renderWeeklyReport, summarizeWeek } from './weekly.js';
 
 const RIOT_MISSING = 'Configure RIOT_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
+const R6_MISSING = 'Configure STATS_CC_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 const CS2_MISSING = 'Configure STEAM_API_KEY (e opcionalmente LEETIFY_API_KEY) no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 
 export class Monitor {
-  constructor({ store, riot, cs2 = null, whatsapp, logger = console, now = () => Date.now() }) {
-    Object.assign(this, { store, riot, cs2, whatsapp, logger, now });
+  constructor({ store, riot, cs2 = null, r6 = null, whatsapp, logger = console, now = () => Date.now() }) {
+    Object.assign(this, { store, riot, cs2, r6, whatsapp, logger, now });
     this.running = false;
     this.lastCheckAt = null;
     this.lastError = null;
@@ -44,7 +45,7 @@ export class Monitor {
     this.lastError = null;
     try {
       const enabledPlayers = this.store.players().filter(player => player.enabled);
-      if (!enabledPlayers.length && !this.riot?.configured && !this.cs2?.configured) {
+      if (!enabledPlayers.length && !this.riot?.configured && !this.cs2?.configured && !this.r6?.configured) {
         throw new Error(RIOT_MISSING);
       }
       const rateLimited = new Set();
@@ -56,13 +57,18 @@ export class Monitor {
           if (game === 'cs2') {
             if (!this.cs2?.configured) throw new Error(CS2_MISSING);
             await this.checkCs2Player(player);
+          } else if (game === 'r6') {
+            if (!this.r6?.configured) throw new Error(R6_MISSING);
+            await this.checkR6Player(player);
           } else {
             if (!this.riot?.configured) throw new Error(RIOT_MISSING);
             await this.checkPlayer(player);
           }
           if (this.store.player(player.id)) this.store.updatePlayer(player.id, { lastCheckedAt: new Date().toISOString(), lastError: null });
         } catch (error) {
-          if (this.store.player(player.id)) this.store.updatePlayer(player.id, { lastCheckedAt: new Date().toISOString(), lastError: error.message });
+          // Perfil oculto pelo dono (termos da stats.cc): pausa o player, o que também segura os envios pendentes.
+          const hidden = error.kind === 'hidden_profile' ? { enabled: false } : {};
+          if (this.store.player(player.id)) this.store.updatePlayer(player.id, { lastCheckedAt: new Date().toISOString(), lastError: error.message, ...hidden });
           this.lastError = error.message;
           if (error.retryAfterMs > 0) rateLimited.add(game);
         }
@@ -166,6 +172,22 @@ export class Monitor {
     }
     if (newestId && this.store.player(player.id)?.enabled && !this.stopped && this.store.settings().monitoringEnabled) {
       this.store.updatePlayer(player.id, { lastSeenMatchId: newestId });
+    }
+  }
+  /** Rainbow Six Siege: só partidas novas depois do cursor (`after`), filtradas pelas playlists acompanhadas. */
+  async checkR6Player(player) {
+    const engine = messagesFor('r6');
+    const entries = await this.r6.newMatches(player);
+    const active = () => this.store.player(player.id)?.enabled && !this.stopped && this.store.settings().monitoringEnabled;
+    for (const { id, match, error } of entries) {
+      if (!active()) return;
+      if (error) this.logger.error({ err: error, matchId: id }, 'Partida do R6 ignorada');
+      if (match && !this.store.hasMatch(player.id, id) && Date.parse(match.endedAt) > Date.parse(player.createdAt)) {
+        const { message } = engine.formatMessage(match, { config: this.store.messageConfig('r6') });
+        this.store.addMatch(player, match, message, this.store.settings().whatsappGroupId);
+      }
+      // O cursor avança partida a partida: uma falha no meio não reenvia nem perde as anteriores.
+      this.store.updatePlayer(player.id, { lastSeenMatchId: id });
     }
   }
   /**

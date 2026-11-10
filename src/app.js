@@ -5,6 +5,7 @@ import { calculateKda } from './message.js';
 import { gameModeLabel } from './game-mode.js';
 import { mapLabel } from './cs2-message.js';
 import { Cs2Client, normalizeSteamId } from './cs2.js';
+import { R6Client } from './r6.js';
 import { GAMES, isGame, messagesFor } from './games.js';
 import {
   WEEKLY_BANDS, WEEKLY_LINE_VARIABLES, WEEKLY_RULES, WEEKLY_TEMPLATE_VARIABLES, currentWeeklyWindow,
@@ -17,7 +18,7 @@ class HttpError extends Error {
 const fail = (status, message) => { throw new HttpError(status, message); };
 const parseGame = value => {
   if (value === undefined) return 'lol';
-  if (!isGame(value)) fail(400, 'Jogo inválido. Escolha lol ou cs2.');
+  if (!isGame(value)) fail(400, 'Jogo inválido. Escolha lol, cs2 ou r6.');
   return value;
 };
 const publicPlayer = ({ puuid, lastSeenMatchId, authCode, knownCode, pendingShareCode, pendingSince, ...player }) => (
@@ -48,7 +49,7 @@ const withPerformance = (game, preview) => {
 const publicWeeklyReport = ({ groupId, ...report }) => report;
 const weeklySchedule = settings => ({ weeklyDay: settings.weeklyDay, weeklyHour: settings.weeklyHour });
 
-export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monitor, password = '', logger = console, now = () => Date.now() }) {
+export function createApp({ store, riot, cs2 = new Cs2Client(), r6 = new R6Client(), whatsapp, monitor, password = '', logger = console, now = () => Date.now() }) {
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -109,16 +110,20 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monito
         steamConfigured: cs2.steamConfigured, leetifyConfigured: cs2.leetifyConfigured,
         stats: store.stats('cs2'),
       },
+      r6: { id: 'r6', name: GAMES.r6.name, configured: r6.configured, stats: store.stats('r6') },
     },
+    r6Configured: r6.configured,
     whatsapp: whatsapp.status(),
     monitor: monitor.status(),
     players: store.players().map(publicPlayer),
-    matches: [...store.matches(100, 'lol'), ...store.matches(100, 'cs2')]
+    matches: [...store.matches(100, 'lol'), ...store.matches(100, 'cs2'), ...store.matches(100, 'r6')]
       .sort((a, b) => b.endedAt.localeCompare(a.endedAt))
       .map(publicMatch),
     stats: store.stats(),
   }));
 
+  // Plataformas do R6 vindas do /v2/config da stats.cc (cache no servidor; a chave nunca vai ao navegador).
+  app.get('/api/r6/platforms', async (_req, res) => res.json({ platforms: await r6.platforms() }));
   app.get('/api/message-config', (req, res) => {
     const game = parseGame(req.query.game);
     res.json(messageConfigResponse(game, store.messageConfig(game)));
@@ -178,6 +183,22 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monito
         return res.status(201).json({ player: publicPlayer(player) });
       } catch (error) {
         if (error.message.includes('UNIQUE')) fail(409, 'Este jogador já está cadastrado no Counter-Strike 2.');
+        throw error;
+      }
+    }
+    if (game === 'r6') {
+      const { platform, username } = req.body;
+      if (typeof platform !== 'string' || !/^[a-z0-9-]{1,32}$/.test(platform)) fail(400, 'Escolha a plataforma do player.');
+      if (typeof username !== 'string' || !username.trim() || username.trim().length > 40 || /[/\\?#]/.test(username))
+        fail(400, 'Informe o nick do Rainbow Six Siege, com até 40 caracteres.');
+      if (!r6.configured) fail(400, 'Configure STATS_CC_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.');
+      const { account, baselineMatchId } = await r6.resolvePlayer({ platform, username: username.trim() });
+      if (store.players('r6').some(player => player.profileId === account.profileId)) fail(409, 'Este perfil já está cadastrado no Rainbow Six Siege.');
+      try {
+        const player = store.addPlayer(account, account.platform, baselineMatchId, 'r6');
+        return res.status(201).json({ player: publicPlayer(player) });
+      } catch (error) {
+        if (error.message.includes('UNIQUE')) fail(409, 'Este perfil já está cadastrado no Rainbow Six Siege.');
         throw error;
       }
     }
@@ -254,9 +275,11 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monito
         const activePlayers = store.players().filter(player => player.enabled);
         const hasLol = activePlayers.some(player => (player.game || 'lol') === 'lol');
         const hasCs2 = activePlayers.some(player => player.game === 'cs2');
-        if (!activePlayers.length && !riot.configured && !cs2.configured) {
-          fail(400, 'Configure RIOT_API_KEY ou STEAM_API_KEY no .env antes de ativar.');
+        const hasR6 = activePlayers.some(player => player.game === 'r6');
+        if (!activePlayers.length && !riot.configured && !cs2.configured && !r6.configured) {
+          fail(400, 'Configure RIOT_API_KEY, STEAM_API_KEY ou STATS_CC_API_KEY no .env antes de ativar.');
         }
+        if (hasR6 && !r6.configured) fail(400, 'Configure STATS_CC_API_KEY no .env antes de ativar.');
         if (hasLol && !riot.configured) fail(400, 'Configure RIOT_API_KEY no .env antes de ativar.');
         if (hasCs2 && !cs2.configured) fail(400, 'Configure STEAM_API_KEY no .env antes de ativar.');
         if (activePlayers.some(player => player.game === 'cs2' && player.authCode) && !cs2.steamConfigured) {
@@ -375,7 +398,7 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), whatsapp, monito
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Rota não encontrada.')));
   app.use(express.static(fileURLToPath(new URL('../public/', import.meta.url)), { etag: true }));
   app.use((error, _req, res, _next) => {
-    const upstreamError = error.name === 'RiotError' || error.name === 'Cs2Error';
+    const upstreamError = error.name === 'RiotError' || error.name === 'Cs2Error' || error.name === 'R6Error';
     const status = error.status || (error.name === 'MessageConfigError' ? 400 : upstreamError ? 502 : 500);
     if (status >= 500) logger.error({ error: error.message }, 'Erro na requisição');
     const message = error instanceof HttpError || upstreamError || error.name === 'MessageConfigError' || status < 500

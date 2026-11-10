@@ -1,4 +1,9 @@
 import { MessageConfigError, render, selectIndex, splitPlayerName, validateText } from './message.js';
+import { R6_CREDIT } from './r6-message.js';
+
+const GAME_LABELS = { lol: 'LOL', cs2: 'CS2', r6: 'R6' };
+// Crédito exigido pelo provedor de dados, acrescentado ao fim do resumo do jogo.
+const GAME_FOOTERS = { r6: R6_CREDIT };
 
 // Resumo semanal: conta vitórias e derrotas de cada jogador na semana e monta uma única
 // mensagem por jogo, com ranking e zoeira. O elogio é raro de propósito.
@@ -27,7 +32,7 @@ export const WEEKLY_BANDS = [
 const BAND_KEYS = WEEKLY_BANDS.map(band => band.key);
 
 export const WEEKLY_TEMPLATE_VARIABLES = [
-  { key: 'jogo', label: 'Jogo', description: 'LOL ou CS2.', example: 'LOL' },
+  { key: 'jogo', label: 'Jogo', description: 'LOL, CS2 ou R6.', example: 'LOL' },
   { key: 'periodo', label: 'Período', description: 'Primeiro e último dia da semana.', example: '03/11 a 09/11' },
   { key: 'ranking', label: 'Ranking', description: 'Uma linha por jogador, montada com os modelos de linha abaixo.', example: '🥇 SeuAmigo#BR1 — 12V 5D (71%) · KDA 3,10' },
   { key: 'destaque', label: 'Destaque', description: 'Primeiro colocado entre quem jogou pelo menos 3 partidas.', example: 'SeuAmigo#BR1' },
@@ -44,7 +49,7 @@ export const WEEKLY_LINE_VARIABLES = [
   { key: 'partidas_texto', label: 'Partidas por extenso', description: '“1 partida” ou “17 partidas”.', example: '17 partidas' },
   { key: 'vitorias', label: 'Vitórias', description: 'Vitórias na semana.', example: '12' },
   { key: 'derrotas', label: 'Derrotas', description: 'Derrotas na semana.', example: '5' },
-  { key: 'empates', label: 'Empates', description: 'Empates na semana (CS2).', example: '0' },
+  { key: 'empates', label: 'Empates', description: 'Empates na semana (CS2 e R6).', example: '0' },
   { key: 'placar', label: 'Placar', description: 'Vitórias e derrotas, como 12V 5D (empates aparecem como E).', example: '12V 5D' },
   { key: 'winrate', label: 'Taxa de vitória', description: 'Vitórias ÷ (vitórias + derrotas).', example: '71%' },
   { key: 'kda', label: 'KDA da semana', description: '(Abates + assistências) ÷ mortes, somando todas as partidas.', example: '3,10' },
@@ -390,8 +395,9 @@ export function renderWeeklyReport({ game, summaries, period, seed, config }) {
     players.push({ ...stats, position: index + 1, zoeira: values.zoeira });
     return render(stats.band === 'sumido' ? selected.inactiveLine : selected.line, values);
   });
+  const footer = GAME_FOOTERS[game] ? `\n\n${GAME_FOOTERS[game]}` : '';
   const message = render(selected.template, {
-    jogo: game === 'cs2' ? 'CS2' : 'LOL',
+    jogo: GAME_LABELS[game] || 'LOL',
     periodo: period,
     ranking: lines.join('\n\n'),
     destaque: active[0]?.name || '—',
@@ -399,14 +405,14 @@ export function renderWeeklyReport({ game, summaries, period, seed, config }) {
     partidas: String(totalGames),
     vitorias: String(summaries.reduce((sum, stats) => sum + stats.wins, 0)),
     derrotas: String(summaries.reduce((sum, stats) => sum + stats.losses, 0)),
-  });
+  }) + footer;
   if (message.length > 10000) throw new MessageConfigError('O resumo semanal excede 10.000 caracteres. Encurte o modelo ou as frases.');
   return { message, players };
 }
 
 /** Dados fictícios para a prévia quando ainda não há partidas na semana. */
 export function exampleWeekSummaries(game) {
-  const names = game === 'cs2'
+  const names = game === 'cs2' || game === 'r6'
     ? ['SeuAmigo', 'Fulano', 'Ciclano', 'Beltrano', 'Sicrano']
     : ['SeuAmigo#BR1', 'Fulano#BR1', 'Ciclano#BR1', 'Beltrano#BR1', 'Sicrano#BR1'];
   const rows = [

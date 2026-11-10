@@ -4,13 +4,14 @@ import pino from 'pino';
 import { Store } from './store.js';
 import { RiotClient } from './riot.js';
 import { Cs2Client } from './cs2.js';
+import { R6Client } from './r6.js';
 import { WhatsAppClient } from './whatsapp.js';
 import { Monitor } from './monitor.js';
 import { createApp } from './app.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  redact: ['apiKey', 'steamApiKey', 'leetifyApiKey', 'authCode', 'knownCode', 'password', 'qr', 'qrDataUrl'],
+  redact: ['apiKey', 'steamApiKey', 'leetifyApiKey', 'statsCcApiKey', 'headers["x-api-key"]', 'authCode', 'knownCode', 'password', 'qr', 'qrDataUrl'],
 });
 const dataDir = resolve(process.env.DATA_DIR || './data');
 const interval = Number(process.env.POLL_INTERVAL_SECONDS || 120);
@@ -24,9 +25,10 @@ const cs2 = new Cs2Client({
   steamApiKey: process.env.STEAM_API_KEY || '',
   leetifyApiKey: process.env.LEETIFY_API_KEY || '',
 });
+const r6 = new R6Client({ apiKey: process.env.STATS_CC_API_KEY || '' });
 const whatsapp = new WhatsAppClient({ authDir: join(dataDir, 'whatsapp'), logger });
-const monitor = new Monitor({ store, riot, cs2, whatsapp, logger });
-const app = createApp({ store, riot, cs2, whatsapp, monitor, password: process.env.APP_PASSWORD || '', logger });
+const monitor = new Monitor({ store, riot, cs2, r6, whatsapp, logger });
+const app = createApp({ store, riot, cs2, r6, whatsapp, monitor, password: process.env.APP_PASSWORD || '', logger });
 const server = app.listen(port, '0.0.0.0', () => {
   logger.info(`GG Report disponível em http://localhost:${port}`);
   monitor.start();

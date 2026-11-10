@@ -166,7 +166,7 @@ test('the monitor sends one weekly summary per game and never repeats it', async
   assert.match(app.sends[0].messageId, /^3EB0[0-9A-F]{28}$/);
 
   const reports = app.store.weeklyReports();
-  assert.deepEqual(reports.map(report => [report.game, report.status]).sort(), [['cs2', 'skipped'], ['lol', 'sent']]);
+  assert.deepEqual(reports.map(report => [report.game, report.status]).sort(), [['cs2', 'skipped'], ['lol', 'sent'], ['r6', 'skipped']]);
   // Um novo monitor (reinício do container) não gera de novo.
   const restarted = new Monitor({ store: app.store, riot: app.monitor.riot, whatsapp: app.monitor.whatsapp, logger: { error() {} }, now: () => app.week.end + 2 * HOUR });
   assert.deepEqual(restarted.generateWeeklyReports(), []);

@@ -9,7 +9,7 @@
     "start": "node --env-file-if-exists=.env src/server.js",
     "dev": "node --env-file-if-exists=.env --watch src/server.js",
     "test": "node --test",
-    "check": "node --check src/server.js && node --check src/cs2.js && node --check src/cs2-message.js && node --check public/app.js && node --check public/messages.js && node --check public/weekly.js && node --check public/nav.js && node --check src/weekly.js"
+    "check": "node --check src/server.js && node --check src/cs2.js && node --check src/cs2-message.js && node --check src/r6.js && node --check src/r6-message.js && node --check public/app.js && node --check public/messages.js && node --check public/weekly.js && node --check public/nav.js && node --check src/weekly.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc14",
