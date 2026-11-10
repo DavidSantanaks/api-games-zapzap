@@ -328,7 +328,9 @@ function lolPreviewMatch(scenario) {
  * modelos padrão, valores da partida e prévias); validação, escolha determinística e renderização são comuns.
  */
 export function createMessageEngine(profile) {
-  const { game, variables, categories, budgets, defaults, values: valuesFor, classify, previewMatch, ui, previousPhrases = [] } = profile;
+  const { game, variables, categories, budgets, defaults, values: valuesFor, classify, previewMatch, ui, previousPhrases = [], footer = '' } = profile;
+  // Rodapé fixo exigido por um provedor de dados (ex.: crédito da stats.cc): fica fora do editor e não pode ser removido.
+  const suffix = footer ? `\n\n${footer}` : '';
   const keys = new Set(variables.map(variable => variable.key));
 
   function validateExpansionLengths(templates, phrases) {
@@ -337,7 +339,7 @@ export function createMessageEngine(profile) {
     ]));
     for (const template of templates) {
       for (const category of categories) {
-        if (estimatedLength(template.text, { ...budgets, zoeira: phraseBudgets[category] }) > 10000) {
+        if (estimatedLength(template.text, { ...budgets, zoeira: phraseBudgets[category] }) + suffix.length > 10000) {
           throw new MessageConfigError(`A variação “${template.name}” pode ultrapassar 10.000 caracteres ao preencher os dados e a zoeira. Reduza a repetição de campos ou frases.`);
         }
       }
@@ -400,7 +402,7 @@ export function createMessageEngine(profile) {
       : validateText(phrase, { label: 'A frase personalizada', max: 300, phrase: true }, keys);
     const values = valuesFor(match);
     values.zoeira = render(phraseText, values);
-    const message = render(template.text, values);
+    const message = render(template.text, values) + suffix;
     if (message.length > 10000) throw new MessageConfigError('A mensagem pronta excede 10.000 caracteres. Reduza o modelo ou a frase.');
     return { message, category, templateId: template.id, templateName: template.name, phraseIndex: selectedPhraseIndex, values };
   }
@@ -411,7 +413,7 @@ export function createMessageEngine(profile) {
   }
 
   return {
-    game, variables, categories, ui, classify, validateConfig, formatMessage, createPreview,
+    game, variables, categories, ui, classify, validateConfig, formatMessage, createPreview, footer,
     defaultConfig: () => structuredClone(defaults),
     /** Versões antigas das frases padrão; só servem para atualizar categorias nunca editadas. */
     previousPhrasePools: () => structuredClone(previousPhrases),
