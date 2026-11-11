@@ -75,10 +75,11 @@ test('the report ranks players, picks highlight and bagre, and is stable per wee
   assert.equal(first.message, again.message);
   assert.deepEqual(first.players.map(player => [player.playerId, player.band]), [['bom', 'elogio'], ['ruim', 'bagre'], ['turista', 'sumido']]);
   assert.match(first.message, /^📅 RESUMO SEMANAL — LOL\nSemana de 03\/11 a 09\/11/);
-  assert.match(first.message, /🥇 Bom#BR1 — 12V 5D \(71%\) · KDA 3,10/);
-  assert.match(first.message, /🥈 Ruim#BR1 — 3V 9D \(25%\)/);
+  assert.match(first.message, /🥇 Bom#BR1 — 17 partidas · 12V 5D \(71%\) · KDA 3,10/);
+  assert.match(first.message, /🥈 Ruim#BR1 — 12 partidas · 3V 9D \(25%\)/);
   assert.match(first.message, /💤 Turista#BR1 — 1 partida/);
-  assert.match(first.message, /🏆 Destaque: Bom#BR1\n🐟 Bagre da semana: Ruim#BR1$/);
+  assert.match(first.message, /🏆 Destaque: Bom#BR1 \(17 partidas · 12V 5D · KDA 3,10\)\n.+\n\n🐟 Bagre da semana: Ruim#BR1 \(12 partidas · 3V 9D · KDA 0,60\)\n.+$/);
+  assert.deepEqual([first.highlight.reason, first.bagre.reason], ['destaque_completo', 'bagre_completo']);
   assert.equal(renderWeeklyReport({ game: 'lol', summaries: [stats(0, 0, 0)], period: 'x', seed: 'x' }), null);
 });
 
@@ -161,7 +162,7 @@ test('the monitor sends one weekly summary per game and never repeats it', async
   assert.equal(app.sends.length, 1);
   assert.equal(app.sends[0].groupId, GROUP);
   assert.match(app.sends[0].text, /RESUMO SEMANAL — LOL/);
-  assert.match(app.sends[0].text, /Amigo#BR1 — 3V 1D \(75%\)/);
+  assert.match(app.sends[0].text, /Amigo#BR1 — 4 partidas · 3V 1D \(75%\)/);
   assert.doesNotMatch(app.sends[0].text, /Pausado/, 'jogador pausado fica fora');
   assert.match(app.sends[0].messageId, /^3EB0[0-9A-F]{28}$/);
 
@@ -246,4 +247,69 @@ test('weekly API: schedule validation, example preview without sending and retry
   assert.equal(retried.data.report.status, 'pending');
   assert.equal(retried.data.report.groupId, undefined);
   assert.equal(calls.refresh, 1);
+});
+
+test('highlight and bagre come from wins + KDA, each with an acid reason', async () => {
+  const { weeklyScore, highlightReason, exampleWeekSummaries } = await import('../src/weekly.js');
+  // KDA limitado a 4: metade da nota é a taxa de vitória, metade o KDA.
+  assert.equal(weeklyScore({ winrate: 1, kda: 9 }), 1);
+  assert.equal(weeklyScore({ winrate: null, kda: 2 }), 0.5);
+  const row = (winrate, kda) => ({ winrate, kda });
+  assert.equal(highlightReason(row(0.7, 2), 'destaque'), 'destaque_completo');
+  assert.equal(highlightReason(row(0.33, 4.6), 'destaque'), 'destaque_kda');
+  assert.equal(highlightReason(row(0.75, 0.85), 'destaque'), 'destaque_carregado');
+  assert.equal(highlightReason(row(0.3, 0.5), 'destaque'), 'destaque_menos_pior');
+  assert.equal(highlightReason(row(0.25, 0.6), 'bagre'), 'bagre_completo');
+  assert.equal(highlightReason(row(0.3, 1.8), 'bagre'), 'bagre_derrotas');
+  assert.equal(highlightReason(row(0.6, 0.7), 'bagre'), 'bagre_carona');
+  assert.equal(highlightReason(row(0.6, 1.5), 'bagre'), 'bagre_lanterna');
+
+  // Quem perdeu mais mas teve KDA absurdo passa quem ganhou carregado.
+  const report = renderWeeklyReport({ game: 'cs2', summaries: exampleWeekSummaries('cs2'), period: '09/11 a 15/11', seed: 'semana' });
+  assert.equal(report.players[0].name, 'Fulano');
+  assert.deepEqual(report.highlight, { playerId: 'exemplo-1', reason: 'destaque_kda' });
+  assert.deepEqual(report.bagre, { playerId: 'exemplo-3', reason: 'bagre_completo' });
+  assert.match(report.message, /🎮 Grupo: 49 partidas · 23V 26D/);
+  assert.match(report.message, /🏆 Destaque: Fulano \(12 partidas · 4V 8D · KDA 4,60\)\n.+/);
+  const reasonPool = getDefaultWeeklyConfig().phrases.destaque_kda.map(phrase => phrase.replace(/\{\{\w+\}\}/g, '').slice(0, 12));
+  const motivo = report.message.split('\n')[report.message.split('\n').findIndex(line => line.startsWith('🏆')) + 1];
+  assert.ok(reasonPool.some(start => motivo.includes(start.trim().slice(0, 8))), 'motivo vem das frases de destaque pelo KDA');
+
+  // Com um só jogador ativo não há bagre nem linha de motivo sobrando.
+  const solo = renderWeeklyReport({ game: 'lol', summaries: [{ ...stats(4, 3, 1, 2), playerId: 'a', name: 'Amigo#BR1' }], period: 'x', seed: 'x' });
+  assert.equal(solo.bagre, null);
+  assert.match(solo.message, /🐟 Bagre da semana: —$/);
+  assert.doesNotMatch(solo.message, /\n{3,}/);
+});
+
+test('saved weekly configs upgrade additively: pristine v2 becomes v3, edited ones only gain the new pools', async () => {
+  const { upgradeWeeklyConfig, WEEKLY_CONFIG_V2_FOR_TESTS } = await import('../src/weekly.js');
+  assert.deepEqual(upgradeWeeklyConfig(WEEKLY_CONFIG_V2_FOR_TESTS), getDefaultWeeklyConfig());
+  const edited = structuredClone(WEEKLY_CONFIG_V2_FOR_TESTS);
+  edited.template = '{{ranking}}\nMeu modelo';
+  edited.phrases.bagre = ['Frase minha, {{nick}}.'];
+  const upgraded = upgradeWeeklyConfig(edited);
+  assert.equal(upgraded.template, '{{ranking}}\nMeu modelo');
+  assert.deepEqual(upgraded.phrases.bagre, ['Frase minha, {{nick}}.']);
+  assert.deepEqual(upgraded.phrases.destaque_kda, getDefaultWeeklyConfig().phrases.destaque_kda);
+  assert.deepEqual(validateWeeklyConfig(upgraded), upgraded);
+  const current = getDefaultWeeklyConfig();
+  assert.equal(upgradeWeeklyConfig(current), current, 'configuração atual não é regravada');
+
+  // No banco: a configuração editada é atualizada uma vez na inicialização.
+  const { DatabaseSync } = await import('node:sqlite');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'gg-weekly-v3-'));
+  const file = join(dir, 'gg.db');
+  try {
+    new Store(file).close();
+    const raw = new DatabaseSync(file);
+    raw.prepare('UPDATE weekly_config SET payload=? WHERE id=1').run(JSON.stringify(edited));
+    raw.close();
+    const store = new Store(file);
+    assert.deepEqual(store.weeklyConfig(), upgraded);
+    store.close();
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

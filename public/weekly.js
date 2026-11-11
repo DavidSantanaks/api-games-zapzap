@@ -71,7 +71,7 @@
       return node;
     }));
     const tabs = $('weekly-band-tabs');
-    tabs.replaceChildren(...state.bands.map(entry => {
+    tabs.replaceChildren(...phraseGroups().map(entry => {
       const button = el('button', `preview-tab${entry.key === band ? ' active' : ''}`, entry.label);
       button.type = 'button';
       button.setAttribute('aria-pressed', String(entry.key === band));
@@ -95,8 +95,11 @@
     }));
   }
 
+  // Faixas do ranking + motivos do destaque e do bagre (servidores antigos mandam só as faixas).
+  function phraseGroups() { return state.phraseGroups || state.bands; }
   function renderPhrases() {
-    const entry = state.bands.find(item => item.key === band);
+    const entry = phraseGroups().find(item => item.key === band) || phraseGroups()[0];
+    band = entry.key;
     $('weekly-band-range').textContent = `${entry.label}: ${entry.range}.`;
     $('weekly-phrases').value = draft.phrases[band].join('\n');
   }

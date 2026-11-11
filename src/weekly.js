@@ -20,6 +20,8 @@ export const WEEKLY_RULES = Object.freeze({
   elogioWinrate: 0.70,
   elogioMinGames: 15,
   elogioMinKda: 3,
+  // Nota do ranking (destaque e bagre): metade taxa de vitória, metade KDA (limitado a 4).
+  scoreKdaCap: 4,
 });
 
 export const WEEKLY_BANDS = [
@@ -31,12 +33,35 @@ export const WEEKLY_BANDS = [
 ];
 const BAND_KEYS = WEEKLY_BANDS.map(band => band.key);
 
+/**
+ * Motivos do destaque e do bagre. O caso depende de dois eixos: vitórias ≥ 50% (empates não contam)
+ * e KDA da semana ≥ 1. Cada caso tem as próprias frases ácidas.
+ */
+export const WEEKLY_HIGHLIGHTS = [
+  { key: 'destaque_completo', label: 'Destaque · completo', range: 'Vitórias ≥ 50% e KDA ≥ 1' },
+  { key: 'destaque_kda', label: 'Destaque · salvo pelo KDA', range: 'Mais derrotas que vitórias, mas KDA ≥ 1' },
+  { key: 'destaque_carregado', label: 'Destaque · carregado', range: 'Vitórias ≥ 50%, mas KDA < 1' },
+  { key: 'destaque_menos_pior', label: 'Destaque · menos pior', range: 'Mais derrotas que vitórias e KDA < 1' },
+  { key: 'bagre_completo', label: 'Bagre · completo', range: 'Mais derrotas que vitórias e KDA < 1' },
+  { key: 'bagre_derrotas', label: 'Bagre · só perde', range: 'Mais derrotas que vitórias, mesmo com KDA ≥ 1' },
+  { key: 'bagre_carona', label: 'Bagre · de carona', range: 'Vitórias ≥ 50%, mas KDA < 1' },
+  { key: 'bagre_lanterna', label: 'Bagre · lanterna', range: 'Vitórias ≥ 50% e KDA ≥ 1, só foi o pior do grupo' },
+];
+const HIGHLIGHT_KEYS = WEEKLY_HIGHLIGHTS.map(entry => entry.key);
+const PHRASE_KEYS = [...BAND_KEYS, ...HIGHLIGHT_KEYS];
+/** Faixas e motivos na ordem das abas do editor. */
+export const WEEKLY_PHRASE_GROUPS = [...WEEKLY_BANDS, ...WEEKLY_HIGHLIGHTS];
+
 export const WEEKLY_TEMPLATE_VARIABLES = [
   { key: 'jogo', label: 'Jogo', description: 'LOL, CS2 ou R6.', example: 'LOL' },
   { key: 'periodo', label: 'Período', description: 'Primeiro e último dia da semana.', example: '03/11 a 09/11' },
   { key: 'ranking', label: 'Ranking', description: 'Uma linha por jogador, montada com os modelos de linha abaixo.', example: '🥇 SeuAmigo#BR1 — 12V 5D (71%) · KDA 3,10' },
-  { key: 'destaque', label: 'Destaque', description: 'Primeiro colocado entre quem jogou pelo menos 3 partidas.', example: 'SeuAmigo#BR1' },
-  { key: 'bagre', label: 'Bagre da semana', description: 'Último colocado entre quem jogou pelo menos 3 partidas.', example: 'Fulano#BR1' },
+  { key: 'destaque', label: 'Destaque', description: 'Melhor nota (vitórias + KDA) entre quem jogou pelo menos 3 partidas.', example: 'Fulano#BR1' },
+  { key: 'destaque_motivo', label: 'Motivo do destaque', description: 'Frase ácida explicando por que ele foi o destaque.', example: 'Destaque pelo KDA 4,60, porque pelo placar (4V 8D) era bagre.' },
+  { key: 'destaque_resumo', label: 'Números do destaque', description: 'Partidas, placar e KDA do destaque.', example: '12 partidas · 4V 8D · KDA 4,60' },
+  { key: 'bagre', label: 'Bagre da semana', description: 'Pior nota entre quem jogou pelo menos 3 partidas (precisa de 2+ ativos).', example: 'Beltrano#BR1' },
+  { key: 'bagre_motivo', label: 'Motivo do bagre', description: 'Frase ácida explicando por que ele foi o bagre.', example: 'Bagre completo: 3V 9D e KDA 0,60.' },
+  { key: 'bagre_resumo', label: 'Números do bagre', description: 'Partidas, placar e KDA do bagre.', example: '12 partidas · 3V 9D · KDA 0,60' },
   { key: 'partidas', label: 'Partidas do grupo', description: 'Total de partidas de todos os jogadores.', example: '34' },
   { key: 'vitorias', label: 'Vitórias do grupo', description: 'Total de vitórias de todos os jogadores.', example: '20' },
   { key: 'derrotas', label: 'Derrotas do grupo', description: 'Total de derrotas de todos os jogadores.', example: '14' },
@@ -57,7 +82,7 @@ export const WEEKLY_LINE_VARIABLES = [
 ];
 const TEMPLATE_KEYS = new Set(WEEKLY_TEMPLATE_VARIABLES.map(variable => variable.key));
 const LINE_KEYS = new Set(WEEKLY_LINE_VARIABLES.map(variable => variable.key));
-const TEMPLATE_BUDGETS = { jogo: 10, periodo: 20, destaque: 64, bagre: 64, partidas: 6, vitorias: 6, derrotas: 6 };
+const TEMPLATE_BUDGETS = { jogo: 10, periodo: 20, destaque: 64, bagre: 64, destaque_resumo: 60, bagre_resumo: 60, partidas: 6, vitorias: 6, derrotas: 6 };
 const LINE_BUDGETS = {
   posicao: 4, player: 64, nick: 64, partidas: 4, partidas_texto: 15, vitorias: 4, derrotas: 4, empates: 4,
   placar: 20, winrate: 5, kda: 12,
@@ -111,7 +136,8 @@ const WEEKLY_CONFIG_V1 = {
   },
 };
 
-const DEFAULT_WEEKLY_CONFIG = {
+// Padrão da segunda versão (09/11/2026), também só para atualizar quem nunca editou.
+const WEEKLY_CONFIG_V2 = {
   template: WEEKLY_CONFIG_V1.template,
   line: WEEKLY_CONFIG_V1.line,
   inactiveLine: WEEKLY_CONFIG_V1.inactiveLine,
@@ -166,9 +192,90 @@ const DEFAULT_WEEKLY_CONFIG = {
   },
 };
 
+const HIGHLIGHT_PHRASES = {
+  destaque_completo: [
+    'Ganhou mais do que perdeu e ainda teve KDA {{kda}}. Não se acostuma, {{nick}}, foi alinhamento dos astros.',
+    '{{placar}} com KDA {{kda}}. Foi o melhor de um grupo fraco, o que não é bem um elogio.',
+    'Destaque por fazer o básico direito: {{placar}}. O nível aqui tá tão baixo que isso virou troféu.',
+    'KDA {{kda}} e {{winrate}} de vitória. Parabéns, {{nick}}: caolho em terra de cego.',
+    'Destaque da semana. Aproveita o print, que semana que vem o grupo volta a te carregar.',
+  ],
+  destaque_kda: [
+    'Destaque pelo KDA {{kda}}, porque pelo placar ({{placar}}) era bagre. Matou todo mundo e perdeu mesmo assim.',
+    '{{derrotas}} derrotas e ainda é o destaque. KDA {{kda}} de quem joga bonito pra perder bonito.',
+    'Carregou o time nas costas direitinho... até a derrota. {{placar}} com KDA {{kda}}.',
+    'Estatística de pro player, resultado de quem nem devia estar no rank: {{placar}}. Destaque por pena, {{nick}}.',
+    'KDA {{kda}} e {{winrate}} de vitória. Farmou kill enquanto a partida ia embora.',
+    'O grupo tá numa fase tão vergonhosa que o destaque perdeu {{derrotas}} de {{partidas}}. KDA {{kda}} não paga essa conta.',
+  ],
+  destaque_carregado: [
+    'Destaque pelas vitórias, porque com KDA {{kda}} só pode ter sido carregado. Agradece o time, {{nick}}.',
+    '{{placar}} com KDA {{kda}}. Ganhou de mochila nas costas dos outros.',
+    'O placar diz destaque, o KDA {{kda}} diz passageiro. Pagou a passagem pelo menos, {{nick}}?',
+    '{{vitorias}} vitórias morrendo mais do que matando. Isso não é carry, é carona.',
+    'Destaque com KDA {{kda}}. O grupo tá tão ruim que até o carregado ganhou medalha.',
+  ],
+  destaque_menos_pior: [
+    'Destaque por ser o menos pior: {{placar}} e KDA {{kda}}. Que semana vergonhosa, grupo.',
+    'Ninguém prestou, então sobrou pro {{nick}}. {{placar}} e KDA {{kda}} levaram a medalha de lata.',
+    'Com {{placar}} e KDA {{kda}}, ser destaque aqui é ganhar concurso de quem caiu menos da escada.',
+    'Medalha de consolação pro {{nick}}. Nem ele merecia, mas os outros mereciam menos.',
+  ],
+  bagre_completo: [
+    'Bagre completo: {{placar}} e KDA {{kda}}. Perdeu e ainda deu kill de graça pro inimigo.',
+    '{{derrotas}} derrotas e KDA {{kda}}. Não jogou a semana, fez estágio no time adversário.',
+    'Nem o KDA salvou: {{kda}}. {{nick}} é peso morto com conexão de internet.',
+    'Perdeu, morreu, perdeu de novo. {{placar}}. Desinstala com carinho, {{nick}}.',
+  ],
+  bagre_derrotas: [
+    'KDA {{kda}} até bonitinho, mas {{placar}}. Matou muito e não ganhou nada, igual figurante de filme de ação.',
+    'Estatística pra print, placar pra vergonha: {{placar}}. Bagre com KDA de influencer.',
+    '{{derrotas}} derrotas com KDA {{kda}}. Joga pra si, perde pro time. Clássico.',
+    'Bagre pelo resultado: {{winrate}} de vitória. O KDA {{kda}} não paga a conta, {{nick}}.',
+  ],
+  bagre_carona: [
+    'Ganhou {{vitorias}}, mas com KDA {{kda}}. Pegou carona no time e ainda quer dividir o prêmio.',
+    'O placar ({{placar}}) engana, o KDA {{kda}} não. Foi carregado a semana inteira, {{nick}}.',
+    'Bagre de mochila: a vitória é dos outros, a morte é sua. KDA {{kda}}.',
+    '{{placar}} com KDA {{kda}}. Se o time soubesse quem tava atrapalhando, ganhava ainda mais.',
+  ],
+  bagre_lanterna: [
+    'Último de uma semana boa. Bagre por comparação, mas bagre mesmo assim, {{nick}}.',
+    '{{placar}} e KDA {{kda}}. Em grupo normal passava, aqui ficou na lanterna.',
+    'Bagre técnico: nem foi tão mal, só foi pior que todo mundo. {{placar}}.',
+    'O grupo jogou bem e {{nick}} só acompanhou. Lanterna com {{winrate}} de vitória.',
+  ],
+};
+
+const DEFAULT_WEEKLY_CONFIG = {
+  template: [
+    '📅 RESUMO SEMANAL — {{jogo}}', 'Semana de {{periodo}}',
+    '🎮 Grupo: {{partidas}} partidas · {{vitorias}}V {{derrotas}}D', '',
+    '{{ranking}}', '',
+    '🏆 Destaque: {{destaque}} ({{destaque_resumo}})', '{{destaque_motivo}}', '',
+    '🐟 Bagre da semana: {{bagre}} ({{bagre_resumo}})', '{{bagre_motivo}}',
+  ].join('\n'),
+  line: '{{posicao}} {{player}} — {{partidas_texto}} · {{placar}} ({{winrate}}) · KDA {{kda}}\n{{zoeira}}',
+  inactiveLine: WEEKLY_CONFIG_V1.inactiveLine,
+  phrases: { ...WEEKLY_CONFIG_V2.phrases, ...HIGHLIGHT_PHRASES },
+};
+
 export const getDefaultWeeklyConfig = () => structuredClone(DEFAULT_WEEKLY_CONFIG);
 /** Verdadeiro quando a configuração salva é um padrão antigo nunca editado pelo usuário. */
-export const isLegacyWeeklyConfig = config => JSON.stringify(config) === JSON.stringify(WEEKLY_CONFIG_V1);
+export const isLegacyWeeklyConfig = config => [WEEKLY_CONFIG_V1, WEEKLY_CONFIG_V2]
+  .some(legacy => JSON.stringify(config) === JSON.stringify(legacy));
+/**
+ * Atualização aditiva do resumo salvo: padrão antigo nunca editado vira o atual; configuração editada
+ * ganha só as frases que faltam (motivos de destaque/bagre), sem mexer nos textos do usuário.
+ */
+export function upgradeWeeklyConfig(config) {
+  if (isLegacyWeeklyConfig(config)) return getDefaultWeeklyConfig();
+  if (!record(config) || !record(config.phrases)) return config;
+  const missing = PHRASE_KEYS.filter(key => !Object.hasOwn(config.phrases, key));
+  if (!missing.length) return config;
+  const defaults = getDefaultWeeklyConfig().phrases;
+  return { ...config, phrases: { ...config.phrases, ...Object.fromEntries(missing.map(key => [key, defaults[key]])) } };
+}
 
 // ---------------------------------------------------------------------------
 // Datas no fuso de São Paulo
@@ -303,10 +410,27 @@ export function classifyWeek(stats) {
   return 'obrigacao';
 }
 
+/** Nota da semana (0 a 1): metade taxa de vitória, metade KDA limitado a 4. Só empates contam como 50%. */
+export function weeklyScore(stats) {
+  const winrate = stats.winrate ?? 0.5;
+  return winrate / 2 + Math.min(stats.kda, WEEKLY_RULES.scoreKdaCap) / WEEKLY_RULES.scoreKdaCap / 2;
+}
+/** Motivo do destaque ou do bagre, pelos eixos vitórias ≥ 50% e KDA ≥ 1. */
+export function highlightReason(stats, kind) {
+  const winning = (stats.winrate ?? 0.5) >= 0.5;
+  const kdaOk = stats.kda >= 1;
+  if (kind === 'destaque') {
+    if (winning) return kdaOk ? 'destaque_completo' : 'destaque_carregado';
+    return kdaOk ? 'destaque_kda' : 'destaque_menos_pior';
+  }
+  if (winning) return kdaOk ? 'bagre_lanterna' : 'bagre_carona';
+  return kdaOk ? 'bagre_derrotas' : 'bagre_completo';
+}
+
 function rankWeek(summaries) {
-  const rated = summaries.map(stats => ({ ...stats, band: classifyWeek(stats) }));
+  const rated = summaries.map(stats => ({ ...stats, band: classifyWeek(stats), score: weeklyScore(stats) }));
   const active = rated.filter(stats => stats.band !== 'sumido').sort((a, b) =>
-    (b.winrate ?? 0.5) - (a.winrate ?? 0.5) || b.wins - a.wins || b.kda - a.kda || a.name.localeCompare(b.name));
+    b.score - a.score || b.games - a.games || b.wins - a.wins || a.name.localeCompare(b.name));
   const inactive = rated.filter(stats => stats.band === 'sumido')
     .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name));
   return { active, inactive };
@@ -337,13 +461,13 @@ export function validateWeeklyConfig(config) {
   const inactiveLine = validateText(config.inactiveLine, { label: 'A linha de quem sumiu', max: 500 }, LINE_KEYS);
   if (!record(config.phrases)) throw new MessageConfigError('As frases do resumo semanal devem ser um objeto.');
   const phraseKeys = Object.keys(config.phrases);
-  if (phraseKeys.length !== BAND_KEYS.length || phraseKeys.some(key => !BAND_KEYS.includes(key))) {
+  if (phraseKeys.length !== PHRASE_KEYS.length || phraseKeys.some(key => !PHRASE_KEYS.includes(key))) {
     throw new MessageConfigError('As faixas do resumo semanal têm campos ausentes ou não permitidos.');
   }
   const phrases = {};
-  for (const band of BAND_KEYS) {
+  for (const band of PHRASE_KEYS) {
     const pool = config.phrases[band];
-    const label = WEEKLY_BANDS.find(entry => entry.key === band).label;
+    const label = WEEKLY_PHRASE_GROUPS.find(entry => entry.key === band).label;
     if (!Array.isArray(pool) || pool.length < 1 || pool.length > 30) {
       throw new MessageConfigError(`A faixa ${label} deve ter entre 1 e 30 frases.`);
     }
@@ -352,11 +476,12 @@ export function validateWeeklyConfig(config) {
     }, LINE_KEYS).trim());
   }
   // Pior caso: 20 jogadores com nomes longos e as frases mais longas.
-  const zoeira = Math.max(...Object.values(phrases).flat().map(phrase => estimatedLength(phrase, LINE_BUDGETS)));
+  const zoeira = Math.max(...BAND_KEYS.flatMap(key => phrases[key]).map(phrase => estimatedLength(phrase, LINE_BUDGETS)));
+  const motivo = Math.max(...HIGHLIGHT_KEYS.flatMap(key => phrases[key]).map(phrase => estimatedLength(phrase, LINE_BUDGETS)));
   const lineLength = Math.max(
     estimatedLength(line, { ...LINE_BUDGETS, zoeira }), estimatedLength(inactiveLine, { ...LINE_BUDGETS, zoeira }));
   const ranking = WEEKLY_MAX_PLAYERS * (lineLength + 2);
-  if (estimatedLength(template, { ...TEMPLATE_BUDGETS, ranking }) > 10000) {
+  if (estimatedLength(template, { ...TEMPLATE_BUDGETS, ranking, destaque_motivo: motivo, bagre_motivo: motivo }) > 10000) {
     throw new MessageConfigError('O resumo semanal pode ultrapassar 10.000 caracteres com 20 jogadores. Encurte o modelo, as linhas ou as frases.');
   }
   return { template, line, inactiveLine, phrases };
@@ -396,18 +521,42 @@ export function renderWeeklyReport({ game, summaries, period, seed, config }) {
     return render(stats.band === 'sumido' ? selected.inactiveLine : selected.line, values);
   });
   const footer = GAME_FOOTERS[game] ? `\n\n${GAME_FOOTERS[game]}` : '';
-  const message = render(selected.template, {
+  // Destaque e bagre saem da nota (vitórias + KDA); o motivo é uma frase ácida do caso de cada um.
+  const highlight = (stats, kind) => {
+    if (!stats) return { motivo: '', resumo: '—', reason: null };
+    const reason = highlightReason(stats, kind);
+    const pool = selected.phrases[reason];
+    const values = lineValues(stats, 0);
+    return {
+      reason,
+      motivo: render(pool[selectIndex(`semana:${seed}:${game}:${stats.playerId}:${reason}`, pool.length)], values),
+      resumo: `${values.partidas_texto} · ${values.placar} · KDA ${values.kda}`,
+    };
+  };
+  const top = highlight(active[0], 'destaque');
+  const bottom = highlight(active.length >= 2 ? active.at(-1) : null, 'bagre');
+  const body = render(selected.template, {
     jogo: GAME_LABELS[game] || 'LOL',
     periodo: period,
     ranking: lines.join('\n\n'),
     destaque: active[0]?.name || '—',
+    destaque_motivo: top.motivo,
+    destaque_resumo: top.resumo,
     bagre: active.length >= 2 ? active.at(-1).name : '—',
+    bagre_motivo: bottom.motivo,
+    bagre_resumo: bottom.resumo,
     partidas: String(totalGames),
     vitorias: String(summaries.reduce((sum, stats) => sum + stats.wins, 0)),
     derrotas: String(summaries.reduce((sum, stats) => sum + stats.losses, 0)),
-  }) + footer;
+  });
+  // Sem bagre (só um ativo), a linha do motivo fica vazia: some com as linhas em branco que sobram.
+  const message = body.replace(/\(—\)/g, '').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim() + footer;
   if (message.length > 10000) throw new MessageConfigError('O resumo semanal excede 10.000 caracteres. Encurte o modelo ou as frases.');
-  return { message, players };
+  return {
+    message, players,
+    highlight: active[0] ? { playerId: active[0].playerId, reason: top.reason } : null,
+    bagre: active.length >= 2 ? { playerId: active.at(-1).playerId, reason: bottom.reason } : null,
+  };
 }
 
 /** Dados fictícios para a prévia quando ainda não há partidas na semana. */
@@ -415,8 +564,9 @@ export function exampleWeekSummaries(game) {
   const names = game === 'cs2' || game === 'r6'
     ? ['SeuAmigo', 'Fulano', 'Ciclano', 'Beltrano', 'Sicrano']
     : ['SeuAmigo#BR1', 'Fulano#BR1', 'Ciclano#BR1', 'Beltrano#BR1', 'Sicrano#BR1'];
+  // Fulano perde mais do que ganha mas tem KDA alto (destaque pelo KDA); SeuAmigo ganha carregado.
   const rows = [
-    [12, 5, 0, 120, 52, 41], [6, 4, 0, 60, 50, 30], [8, 8, 0, 70, 80, 50], [3, 9, 0, 30, 95, 25], [1, 0, 0, 9, 4, 3],
+    [9, 3, 0, 40, 60, 11], [4, 8, 0, 150, 40, 34], [6, 6, 0, 80, 75, 25], [3, 9, 0, 30, 90, 24], [1, 0, 0, 9, 4, 3],
   ];
   return rows.map(([wins, losses, draws, kills, deaths, assists], index) => {
     const decisive = wins + losses;
@@ -427,3 +577,4 @@ export function exampleWeekSummaries(game) {
   });
 }
 export const WEEKLY_CONFIG_V1_FOR_TESTS = structuredClone(WEEKLY_CONFIG_V1);
+export const WEEKLY_CONFIG_V2_FOR_TESTS = structuredClone(WEEKLY_CONFIG_V2);

@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getDefaultMessageConfig, getLegacyPhrasePools, validateMessageConfig } from './message.js';
 import { GAME_IDS, messagesFor } from './games.js';
-import { getDefaultWeeklyConfig, isLegacyWeeklyConfig, validateWeeklyConfig } from './weekly.js';
+import { getDefaultWeeklyConfig, upgradeWeeklyConfig, validateWeeklyConfig } from './weekly.js';
 
 // Campos adicionados depois da primeira versão: instalações antigas recebem o padrão ao ler.
 const SETTINGS_DEFAULTS = { weeklyEnabled: true, weeklyDay: 0, weeklyHour: 21 };
@@ -48,9 +48,12 @@ export class Store {
       );
     `);
     this.db.prepare('INSERT OR IGNORE INTO weekly_config (id,payload) VALUES (1,?)').run(JSON.stringify(getDefaultWeeklyConfig()));
-    // Frases padrão antigas e nunca editadas recebem a versão atual; textos do usuário ficam intactos.
-    if (isLegacyWeeklyConfig(this.weeklyConfig())) {
-      this.db.prepare('UPDATE weekly_config SET payload=? WHERE id=1').run(JSON.stringify(getDefaultWeeklyConfig()));
+    // Padrão antigo nunca editado recebe a versão atual; configuração editada só ganha as frases novas
+    // (motivos de destaque e bagre). Textos do usuário ficam intactos.
+    const savedWeekly = this.weeklyConfig();
+    const upgradedWeekly = upgradeWeeklyConfig(savedWeekly);
+    if (upgradedWeekly !== savedWeekly) {
+      this.db.prepare('UPDATE weekly_config SET payload=? WHERE id=1').run(JSON.stringify(upgradedWeekly));
     }
     // O LoL segue na tabela message_config original; os demais jogos têm modelos próprios.
     for (const game of GAME_IDS.filter(id => id !== 'lol')) {

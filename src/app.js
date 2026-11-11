@@ -8,7 +8,7 @@ import { Cs2Client, normalizeSteamId } from './cs2.js';
 import { R6Client } from './r6.js';
 import { GAMES, isGame, messagesFor } from './games.js';
 import {
-  WEEKLY_BANDS, WEEKLY_LINE_VARIABLES, WEEKLY_RULES, WEEKLY_TEMPLATE_VARIABLES, currentWeeklyWindow,
+  WEEKLY_BANDS, WEEKLY_LINE_VARIABLES, WEEKLY_PHRASE_GROUPS, WEEKLY_RULES, WEEKLY_TEMPLATE_VARIABLES, currentWeeklyWindow,
   exampleWeekSummaries, getDefaultWeeklyConfig, lastWeeklyWindow, renderWeeklyReport, summarizeWeek, validateWeeklyConfig,
 } from './weekly.js';
 
@@ -339,6 +339,7 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), r6 = new R6Clien
       templateVariables: WEEKLY_TEMPLATE_VARIABLES,
       lineVariables: WEEKLY_LINE_VARIABLES,
       bands: WEEKLY_BANDS,
+      phraseGroups: WEEKLY_PHRASE_GROUPS,
       rules: WEEKLY_RULES,
       reports: store.weeklyReports(12).map(publicWeeklyReport),
     };
