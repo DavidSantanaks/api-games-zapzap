@@ -70,6 +70,11 @@ Lista criada em **06/11/2026**, a pedido do usuário. Os itens abaixo são suges
 - **Situação:** o modelo e as frases do resumo semanal são compartilhados entre LoL, CS2 e R6 (`weekly_config`).
 - **Proposta:** permitir frases próprias por jogo, se o usuário quiser piadas específicas (PDL, Major etc.).
 
+### M-013 — Enviar o ranking histórico
+
+- **Situação:** a classificação de cada semana fica guardada em `weekly_standings` e aparece no painel "Ranking histórico", mas não é enviada.
+- **Proposta:** mensagem mensal ou sob demanda com quem foi mais vezes destaque, menos bagre, bagre e maior bagre (dados já prontos em `weeklyHall`).
+
 ### M-011 — Detecção mais rápida no R6 com `POST /update`
 
 - **Situação:** o R6 só faz polling do histórico; a stats.cc atualiza as partidas até 5 minutos após o fim.

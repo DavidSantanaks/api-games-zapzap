@@ -203,16 +203,18 @@ KDA 4,60 e 33% de vitória. Farmou kill enquanto a partida ia embora.
 Nem o KDA salvou: 0,60. Beltrano é peso morto com conexão de internet.
 ```
 
-**Ranking, destaque e bagre** saem de uma nota que pesa igual a **taxa de vitória** e o **KDA da semana** (o KDA conta até 4). Assim, quem perdeu mais do que ganhou mas teve KDA absurdo pode ser o destaque, e quem ganhou carregado pode cair no ranking. O destaque e o bagre vêm com um **motivo ácido** conforme o caso:
+**Ranking, destaque e bagre** saem de uma nota que pesa igual a **taxa de vitória** e o **KDA da semana** (o KDA conta até 4). Assim, quem perdeu mais do que ganhou mas teve KDA absurdo pode ser o destaque, e quem ganhou carregado pode cair no ranking. **Destaque precisa de mérito:** vitórias ≥ 50% com KDA ≥ 1, ou KDA ≥ 2 mesmo perdendo mais. Sem isso, o primeiro vira **🥴 O menos bagre** e o último, **🐡 O maior bagre**. Cada um vem com um **motivo ácido** conforme o caso:
 
-| Caso | Destaque | Bagre |
-| --- | --- | --- |
-| Vitórias ≥ 50% e KDA ≥ 1 | completo: “caolho em terra de cego” | lanterna: pior de uma semana boa |
-| Mais derrotas, KDA ≥ 1 | salvo pelo KDA: “matou todo mundo e perdeu mesmo assim” | só perde: “KDA de influencer” |
-| Vitórias ≥ 50%, KDA < 1 | carregado: “isso não é carry, é carona” | de carona: “a vitória é dos outros, a morte é sua” |
-| Mais derrotas e KDA < 1 | menos pior: “medalha de lata” | completo: “perdeu e ainda deu kill de graça” |
+| Primeiro do ranking | Último do ranking |
+| --- | --- |
+| 🏆 Destaque completo (vitórias ≥ 50% e KDA ≥ 1): “caolho em terra de cego” | Bagre completo (mais derrotas e KDA < 1): “perdeu e ainda deu kill de graça” |
+| 🏆 Destaque salvo pelo KDA (mais derrotas, KDA ≥ 2): “matou todo mundo e perdeu mesmo assim” | Bagre que só perde (mais derrotas, KDA ≥ 1): “KDA de influencer” |
+| 🥴 Menos bagre de carona (vitórias ≥ 50%, KDA < 1): “isso não é carry, é carona” | Bagre de carona (vitórias ≥ 50%, KDA < 1): “a vitória é dos outros, a morte é sua” |
+| 🥴 Menos bagre de semana fraca (mais derrotas, KDA < 2): “medalha de lata” | Bagre lanterna (vitórias ≥ 50% e KDA ≥ 1): o pior de uma semana boa |
 
-O bagre só é eleito com pelo menos dois jogadores ativos. A frase de cada jogador no ranking depende da faixa. **O elogio é raro de propósito:** exige as três condições ao mesmo tempo.
+O bagre só é eleito com pelo menos dois jogadores ativos.
+
+**Ranking histórico (não é enviado):** a cada semana encerrada, a classificação de cada jogo fica guardada no SQLite, mesmo com o resumo desligado ou sem grupo. Na primeira vez, as semanas anteriores são montadas a partir das partidas já detectadas (até 2 anos). A seção **Resumo semanal** mostra, por jogo, quantas vezes cada um foi 🏆 destaque, 🥴 menos bagre, 🐟 bagre, 🐡 maior bagre e 💤 sumido, além de partidas, V-D, KDA geral e as últimas semanas. Fica pronto para virar mensagem no futuro. A frase de cada jogador no ranking depende da faixa. **O elogio é raro de propósito:** exige as três condições ao mesmo tempo.
 
 | Faixa | Condição | Tom |
 | --- | --- | --- |
@@ -229,7 +231,7 @@ O bagre só é eleito com pelo menos dois jogadores ativos. A frase de cada joga
 - **Quem entra:** jogadores ativos do jogo. Pausados ficam de fora; quem não jogou aparece como sumido. Semana sem nenhuma partida não gera mensagem.
 - **Quais partidas contam:** as que o monitor **detectou** na semana (do horário de envio anterior até o atual). Assim nenhuma partida conta duas vezes nem se perde; uma partida de CS2 terminada perto das 21h cuja demo demore pode entrar na semana seguinte.
 - **Envio:** na primeira verificação após o horário, com o monitor ativo e o WhatsApp conectado. Se o app estiver desligado, o resumo sai em até 24 horas; depois disso, a semana é pulada. Cada semana é registrada uma única vez por jogo (reiniciar o Docker não repete), com até cinco tentativas e botão para reenviar.
-- **Personalização:** modelo da mensagem (precisa de `{{ranking}}`), linha de quem jogou, linha de quem sumiu, frases de cada faixa e dos oito motivos de destaque/bagre. O modelo aceita `{{destaque_motivo}}`, `{{destaque_resumo}}`, `{{bagre_motivo}}` e `{{bagre_resumo}}`. Quem já tinha editado o resumo mantém os próprios textos e só ganha as frases novas; para ver os motivos, inclua essas variáveis no modelo ou use **Carregar modelo original**. A prévia usa a semana em andamento, a última semana encerrada ou um exemplo fictício, **sem enviar nada**.
+- **Personalização:** modelo da mensagem (precisa de `{{ranking}}`), linha de quem jogou, linha de quem sumiu, frases de cada faixa e dos oito motivos de destaque/bagre. O modelo aceita `{{destaque_titulo}}`, `{{destaque_motivo}}`, `{{destaque_resumo}}`, `{{bagre_titulo}}`, `{{bagre_motivo}}` e `{{bagre_resumo}}`. Quem já tinha editado o resumo mantém os próprios textos e só ganha as frases novas; para ver os motivos, inclua essas variáveis no modelo ou use **Carregar modelo original**. A prévia usa a semana em andamento, a última semana encerrada ou um exemplo fictício, **sem enviar nada**.
 
 </details>
 
