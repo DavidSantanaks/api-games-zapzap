@@ -69,6 +69,7 @@ data, partida_id, zoeira
 - Frases padrão mais ácidas (v2, 09/11/2026). `WEEKLY_CONFIG_V1` fica só como snapshot: na inicialização, se `weekly_config` for exatamente a v1, vira a v2; qualquer edição do usuário é preservada.
 - Uma mensagem por jogo com ranking (🥇🥈🥉, depois 4º…; sumidos com 💤 no fim), destaque e bagre (este só com 2+ jogadores ativos). Frase escolhida de forma determinística por semana e jogador.
 - Persistência aditiva: tabelas `weekly_config` (modelo, linhas e frases compartilhados entre LoL e CS2) e `weekly_reports` (`UNIQUE(game, week_key)`, status `pending`/`sent`/`failed`/`skipped`). Semana sem partidas vira `skipped` e não envia.
+- **Destaque e bagre com motivo (10/11/2026, a pedido do usuário):** linha mostra partidas, placar, taxa e KDA da semana. Ranking, destaque e bagre usam `weeklyScore` = taxa/2 + min(KDA, 4)/4/2 (empate-only = 50%), para que um jogador com mais derrotas e KDA alto possa ser destaque. `highlightReason` define 4 casos para cada um (vitórias ≥ 50% × KDA ≥ 1): `destaque_completo`, `destaque_kda`, `destaque_carregado`, `destaque_menos_pior`, `bagre_lanterna`, `bagre_derrotas`, `bagre_carona`, `bagre_completo`, com frases ácidas editáveis no mesmo `phrases` do `weekly_config` (abas extras no editor via `phraseGroups`). Variáveis novas: `destaque_motivo`, `destaque_resumo`, `bagre_motivo`, `bagre_resumo`. `upgradeWeeklyConfig`: v1/v2 nunca editadas viram a v3; configuração editada só ganha as frases que faltam.
 - `Monitor.generateWeeklyReports()` roda em cada ciclo (monitor ativo), até 24h após o horário; `deliverWeeklyReports()` envia depois das partidas, com até 5 tentativas e ID de mensagem estável. Jogadores pausados ficam fora do resumo.
 - Rotas: `GET /api/weekly`, `GET /api/weekly/defaults`, `PUT /api/weekly/settings`, `PUT /api/weekly/config`, `POST /api/weekly/preview` (`current`/`last`/`example`, nunca envia), `POST /api/weekly/reports/:id/retry`.
 - Interface: seção **Resumo semanal** (`public/weekly.js`) com liga/desliga, dia e hora, faixas, editor com variáveis clicáveis, prévia pela aba ativa e histórico de resumos.
@@ -172,6 +173,7 @@ Credenciais ficam no ambiente (ou protegidas no SQLite no caso de `authCode`/`kn
 
 ## Validação conhecida
 
+- Resumo semanal com motivos (10/11/2026): **114 testes passando** (nota, oito motivos, destaque com mais derrotas pelo KDA, migração aditiva do modelo salvo); editor verificado no navegador.
 - Rainbow Six Siege (10/11/2026): **112 testes passando** (13 novos em `test/r6*.test.js` com `fetch` simulado: perfil, histórico, 404 `unknown_profile`/`hidden_profile`, 403 `missing_scope`, 401, 429/`Retry-After`, `RateLimit-Remaining`, 503, empate/abandono, playlists ignoradas, deduplicação após reinício, isolamento LoL × R6 e migração). `npm run check` passou; aba R6 verificada no navegador (desktop 1400px e celular 390px sem rolagem horizontal) numa instância local isolada sem chave.
 
 - Frases por partida (10/11/2026): 99 testes passando, incluindo `test/phrases-migration.test.js`.

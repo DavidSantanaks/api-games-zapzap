@@ -181,22 +181,38 @@ Todo **domingo às 21h** (horário de Brasília; dia e hora ajustáveis), o GG R
 
 ```text
 📅 RESUMO SEMANAL — LOL
-Semana de 03/11 a 09/11
+Semana de 09/11 a 15/11
+🎮 Grupo: 37 partidas · 17V 20D
 
-🥇 SeuAmigo#BR1 — 12V 5D (71%) · KDA 3,10
-Semana de smurf. Suspeito, mas os números não mentem: 12V 5D.
+🥇 Fulano#BR1 — 12 partidas · 4V 8D (33%) · KDA 4,60
+4V 8D. O time adversário já colocou Fulano nos agradecimentos.
 
-🥈 Fulano#BR1 — 3V 9D (25%) · KDA 0,58
-Semana tão ruim que até o matchmaking pediu desculpa pros seus aliados.
+🥈 SeuAmigo#BR1 — 12 partidas · 9V 3D (75%) · KDA 0,85
+9V 3D. Positivo, mas todo mundo sabe que foi o time que carregou.
+
+🥉 Beltrano#BR1 — 12 partidas · 3V 9D (25%) · KDA 0,60
+Desinstala, Beltrano. Não é zoeira, é conselho. 3V 9D.
 
 💤 Sicrano#BR1 — 1 partida
 Semana de folga. Não perdeu ponto porque nem teve coragem de jogar.
 
-🏆 Destaque: SeuAmigo#BR1
-🐟 Bagre da semana: Fulano#BR1
+🏆 Destaque: Fulano#BR1 (12 partidas · 4V 8D · KDA 4,60)
+KDA 4,60 e 33% de vitória. Farmou kill enquanto a partida ia embora.
+
+🐟 Bagre da semana: Beltrano#BR1 (12 partidas · 3V 9D · KDA 0,60)
+Nem o KDA salvou: 0,60. Beltrano é peso morto com conexão de internet.
 ```
 
-A frase de cada jogador depende da faixa. **O elogio é raro de propósito:** exige as três condições ao mesmo tempo.
+**Ranking, destaque e bagre** saem de uma nota que pesa igual a **taxa de vitória** e o **KDA da semana** (o KDA conta até 4). Assim, quem perdeu mais do que ganhou mas teve KDA absurdo pode ser o destaque, e quem ganhou carregado pode cair no ranking. O destaque e o bagre vêm com um **motivo ácido** conforme o caso:
+
+| Caso | Destaque | Bagre |
+| --- | --- | --- |
+| Vitórias ≥ 50% e KDA ≥ 1 | completo: “caolho em terra de cego” | lanterna: pior de uma semana boa |
+| Mais derrotas, KDA ≥ 1 | salvo pelo KDA: “matou todo mundo e perdeu mesmo assim” | só perde: “KDA de influencer” |
+| Vitórias ≥ 50%, KDA < 1 | carregado: “isso não é carry, é carona” | de carona: “a vitória é dos outros, a morte é sua” |
+| Mais derrotas e KDA < 1 | menos pior: “medalha de lata” | completo: “perdeu e ainda deu kill de graça” |
+
+O bagre só é eleito com pelo menos dois jogadores ativos. A frase de cada jogador no ranking depende da faixa. **O elogio é raro de propósito:** exige as três condições ao mesmo tempo.
 
 | Faixa | Condição | Tom |
 | --- | --- | --- |
@@ -213,7 +229,7 @@ A frase de cada jogador depende da faixa. **O elogio é raro de propósito:** ex
 - **Quem entra:** jogadores ativos do jogo. Pausados ficam de fora; quem não jogou aparece como sumido. Semana sem nenhuma partida não gera mensagem.
 - **Quais partidas contam:** as que o monitor **detectou** na semana (do horário de envio anterior até o atual). Assim nenhuma partida conta duas vezes nem se perde; uma partida de CS2 terminada perto das 21h cuja demo demore pode entrar na semana seguinte.
 - **Envio:** na primeira verificação após o horário, com o monitor ativo e o WhatsApp conectado. Se o app estiver desligado, o resumo sai em até 24 horas; depois disso, a semana é pulada. Cada semana é registrada uma única vez por jogo (reiniciar o Docker não repete), com até cinco tentativas e botão para reenviar.
-- **Personalização:** modelo da mensagem (precisa de `{{ranking}}`), linha de quem jogou, linha de quem sumiu e frases de cada faixa. A prévia usa a semana em andamento, a última semana encerrada ou um exemplo fictício, **sem enviar nada**.
+- **Personalização:** modelo da mensagem (precisa de `{{ranking}}`), linha de quem jogou, linha de quem sumiu, frases de cada faixa e dos oito motivos de destaque/bagre. O modelo aceita `{{destaque_motivo}}`, `{{destaque_resumo}}`, `{{bagre_motivo}}` e `{{bagre_resumo}}`. Quem já tinha editado o resumo mantém os próprios textos e só ganha as frases novas; para ver os motivos, inclua essas variáveis no modelo ou use **Carregar modelo original**. A prévia usa a semana em andamento, a última semana encerrada ou um exemplo fictício, **sem enviar nada**.
 
 </details>
 
