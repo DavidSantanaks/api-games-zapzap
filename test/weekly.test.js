@@ -257,8 +257,10 @@ test('highlight and bagre come from wins + KDA, each with an acid reason', async
   const row = (winrate, kda) => ({ winrate, kda });
   assert.equal(highlightReason(row(0.7, 2), 'destaque'), 'destaque_completo');
   assert.equal(highlightReason(row(0.33, 4.6), 'destaque'), 'destaque_kda');
-  assert.equal(highlightReason(row(0.75, 0.85), 'destaque'), 'destaque_carregado');
-  assert.equal(highlightReason(row(0.3, 0.5), 'destaque'), 'destaque_menos_pior');
+  // Sem mérito, o primeiro é "O menos bagre": venceu carregado, ou perdeu mais sem KDA ≥ 2.
+  assert.equal(highlightReason(row(0.75, 0.85), 'destaque'), 'menos_bagre_carona');
+  assert.equal(highlightReason(row(0.3, 0.5), 'destaque'), 'menos_bagre_fraco');
+  assert.equal(highlightReason(row(0.4, 1.9), 'destaque'), 'menos_bagre_fraco', 'perder mais com KDA < 2 não é destaque');
   assert.equal(highlightReason(row(0.25, 0.6), 'bagre'), 'bagre_completo');
   assert.equal(highlightReason(row(0.3, 1.8), 'bagre'), 'bagre_derrotas');
   assert.equal(highlightReason(row(0.6, 0.7), 'bagre'), 'bagre_carona');
@@ -267,8 +269,8 @@ test('highlight and bagre come from wins + KDA, each with an acid reason', async
   // Quem perdeu mais mas teve KDA absurdo passa quem ganhou carregado.
   const report = renderWeeklyReport({ game: 'cs2', summaries: exampleWeekSummaries('cs2'), period: '09/11 a 15/11', seed: 'semana' });
   assert.equal(report.players[0].name, 'Fulano');
-  assert.deepEqual(report.highlight, { playerId: 'exemplo-1', reason: 'destaque_kda' });
-  assert.deepEqual(report.bagre, { playerId: 'exemplo-3', reason: 'bagre_completo' });
+  assert.deepEqual(report.highlight, { playerId: 'exemplo-1', reason: 'destaque_kda', title: 'destaque' });
+  assert.deepEqual(report.bagre, { playerId: 'exemplo-3', reason: 'bagre_completo', title: 'bagre' });
   assert.match(report.message, /🎮 Grupo: 49 partidas · 23V 26D/);
   assert.match(report.message, /🏆 Destaque: Fulano \(12 partidas · 4V 8D · KDA 4,60\)\n.+/);
   const reasonPool = getDefaultWeeklyConfig().phrases.destaque_kda.map(phrase => phrase.replace(/\{\{\w+\}\}/g, '').slice(0, 12));
@@ -312,4 +314,55 @@ test('saved weekly configs upgrade additively: pristine v2 becomes v3, edited on
     assert.deepEqual(store.weeklyConfig(), upgraded);
     store.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('without merit the top is "O menos bagre" and the bottom "O maior bagre"', async () => {
+  const { weeklyStandings } = await import('../src/weekly.js');
+  const summaries = [
+    { ...stats(12, 9, 3, 0.85), playerId: 'carona', name: 'Carona#BR1' },
+    { ...stats(12, 3, 9, 0.6), playerId: 'pior', name: 'Pior#BR1' },
+    { ...stats(12, 5, 7, 1.5), playerId: 'meio', name: 'Meio#BR1' },
+  ];
+  const report = renderWeeklyReport({ game: 'lol', summaries, period: 'x', seed: 'x' });
+  assert.match(report.message, /🥴 O menos bagre: Carona#BR1 \(12 partidas · 9V 3D · KDA 0,85\)/);
+  assert.match(report.message, /🐡 O maior bagre: Pior#BR1/);
+  assert.doesNotMatch(report.message, /🏆 Destaque/);
+  const standing = weeklyStandings(summaries);
+  assert.equal(standing.merit, false);
+  assert.deepEqual(standing.players.map(entry => [entry.playerId, entry.title]), [['carona', 'menos_bagre'], ['meio', null], ['pior', 'maior_bagre']]);
+  assert.equal(weeklyStandings([stats(0, 0, 0)]), null);
+});
+
+test('weekly standings are stored every closed week, even with the summary off, and feed the hall', async t => {
+  const { weeklyHall } = await import('../src/weekly.js');
+  const app = monitorFixture(t);
+  app.store.updateSettings({ weeklyEnabled: false, whatsappGroupId: '' });
+  const amigo = app.addPlayer('Amigo');
+  const bagre = app.addPlayer('Bagre');
+  app.addMatches(amigo, [true, true, false, true]);
+  app.addMatches(bagre, [false, false, false, false]);
+  // Uma partida antiga, detectada na semana anterior: a classificação dela também é guardada.
+  const old = app.store.addMatch(amigo, { id: 'antiga', playerName: 'Amigo#BR1', win: true, kills: 9, deaths: 1, assists: 0, endedAt: '2026-01-01T00:00:00.000Z' }, 'x', GROUP);
+  app.store.updateDelivery(old.id, { createdAt: new Date(app.week.start - 3 * 24 * HOUR).toISOString() });
+  for (const entry of app.store.dueDeliveries()) app.store.updateDelivery(entry.id, { status: 'sent' });
+
+  await app.monitor.check();
+  await app.monitor.check();
+  assert.equal(app.sends.length, 0, 'guardar não envia nada');
+  const weeks = app.store.weeklyStandings('lol');
+  const current = weeks.find(week => week.weekKey === app.week.key);
+  assert.ok(current, 'semana encerrada guardada');
+  assert.equal(current.merit, true);
+  assert.deepEqual(current.players.map(entry => [entry.name, entry.title, entry.games]), [['Amigo#BR1', 'destaque', 4], ['Bagre#BR1', 'bagre', 4]]);
+  const previous = weeks.find(week => week.weekKey !== app.week.key && week.players.length);
+  assert.ok(previous, 'semana anterior preenchida a partir das partidas já detectadas');
+  assert.equal(new Set(weeks.map(week => week.weekKey)).size, weeks.length, 'sem duplicar semanas');
+
+  const hall = weeklyHall(weeks.filter(week => week.players.length));
+  const row = name => hall.find(entry => entry.name === name);
+  assert.equal(row('Amigo#BR1').destaque, 1);
+  assert.equal(row('Amigo#BR1').sumido, 1, 'na semana antiga jogou só 1 partida');
+  assert.equal(row('Amigo#BR1').games, 5);
+  assert.equal(row('Bagre#BR1').bagre, 1);
+  assert.equal(hall[0].name, 'Amigo#BR1');
 });

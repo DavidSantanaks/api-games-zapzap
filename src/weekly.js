@@ -22,6 +22,10 @@ export const WEEKLY_RULES = Object.freeze({
   elogioMinKda: 3,
   // Nota do ranking (destaque e bagre): metade taxa de vitória, metade KDA (limitado a 4).
   scoreKdaCap: 4,
+  // Destaque de verdade precisa de mérito: vitórias ≥ 50% com KDA ≥ 1, ou KDA ≥ 2 mesmo perdendo mais.
+  // Sem isso, o primeiro vira "O menos bagre" e o último, "O maior bagre".
+  destaqueMinKda: 1,
+  destaqueKdaAlone: 2,
 });
 
 export const WEEKLY_BANDS = [
@@ -34,14 +38,14 @@ export const WEEKLY_BANDS = [
 const BAND_KEYS = WEEKLY_BANDS.map(band => band.key);
 
 /**
- * Motivos do destaque e do bagre. O caso depende de dois eixos: vitórias ≥ 50% (empates não contam)
- * e KDA da semana ≥ 1. Cada caso tem as próprias frases ácidas.
+ * Motivos do primeiro e do último do ranking. Destaque exige mérito; sem mérito, o primeiro é "O menos bagre".
+ * O caso depende de vitórias ≥ 50% (empates não contam) e do KDA da semana. Cada caso tem frases ácidas próprias.
  */
 export const WEEKLY_HIGHLIGHTS = [
   { key: 'destaque_completo', label: 'Destaque · completo', range: 'Vitórias ≥ 50% e KDA ≥ 1' },
-  { key: 'destaque_kda', label: 'Destaque · salvo pelo KDA', range: 'Mais derrotas que vitórias, mas KDA ≥ 1' },
-  { key: 'destaque_carregado', label: 'Destaque · carregado', range: 'Vitórias ≥ 50%, mas KDA < 1' },
-  { key: 'destaque_menos_pior', label: 'Destaque · menos pior', range: 'Mais derrotas que vitórias e KDA < 1' },
+  { key: 'destaque_kda', label: 'Destaque · salvo pelo KDA', range: 'Mais derrotas que vitórias, mas KDA ≥ 2' },
+  { key: 'menos_bagre_carona', label: 'Menos bagre · de carona', range: 'Primeiro sem mérito: vitórias ≥ 50%, mas KDA < 1' },
+  { key: 'menos_bagre_fraco', label: 'Menos bagre · semana fraca', range: 'Primeiro sem mérito: mais derrotas e KDA < 2' },
   { key: 'bagre_completo', label: 'Bagre · completo', range: 'Mais derrotas que vitórias e KDA < 1' },
   { key: 'bagre_derrotas', label: 'Bagre · só perde', range: 'Mais derrotas que vitórias, mesmo com KDA ≥ 1' },
   { key: 'bagre_carona', label: 'Bagre · de carona', range: 'Vitórias ≥ 50%, mas KDA < 1' },
@@ -56,9 +60,11 @@ export const WEEKLY_TEMPLATE_VARIABLES = [
   { key: 'jogo', label: 'Jogo', description: 'LOL, CS2 ou R6.', example: 'LOL' },
   { key: 'periodo', label: 'Período', description: 'Primeiro e último dia da semana.', example: '03/11 a 09/11' },
   { key: 'ranking', label: 'Ranking', description: 'Uma linha por jogador, montada com os modelos de linha abaixo.', example: '🥇 SeuAmigo#BR1 — 12V 5D (71%) · KDA 3,10' },
+  { key: 'destaque_titulo', label: 'Título do primeiro', description: '“🏆 Destaque” quando houve mérito; senão “🥴 O menos bagre”.', example: '🏆 Destaque' },
   { key: 'destaque', label: 'Destaque', description: 'Melhor nota (vitórias + KDA) entre quem jogou pelo menos 3 partidas.', example: 'Fulano#BR1' },
   { key: 'destaque_motivo', label: 'Motivo do destaque', description: 'Frase ácida explicando por que ele foi o destaque.', example: 'Destaque pelo KDA 4,60, porque pelo placar (4V 8D) era bagre.' },
   { key: 'destaque_resumo', label: 'Números do destaque', description: 'Partidas, placar e KDA do destaque.', example: '12 partidas · 4V 8D · KDA 4,60' },
+  { key: 'bagre_titulo', label: 'Título do último', description: '“🐟 Bagre da semana” quando houve destaque; senão “🐡 O maior bagre”.', example: '🐟 Bagre da semana' },
   { key: 'bagre', label: 'Bagre da semana', description: 'Pior nota entre quem jogou pelo menos 3 partidas (precisa de 2+ ativos).', example: 'Beltrano#BR1' },
   { key: 'bagre_motivo', label: 'Motivo do bagre', description: 'Frase ácida explicando por que ele foi o bagre.', example: 'Bagre completo: 3V 9D e KDA 0,60.' },
   { key: 'bagre_resumo', label: 'Números do bagre', description: 'Partidas, placar e KDA do bagre.', example: '12 partidas · 3V 9D · KDA 0,60' },
@@ -82,7 +88,7 @@ export const WEEKLY_LINE_VARIABLES = [
 ];
 const TEMPLATE_KEYS = new Set(WEEKLY_TEMPLATE_VARIABLES.map(variable => variable.key));
 const LINE_KEYS = new Set(WEEKLY_LINE_VARIABLES.map(variable => variable.key));
-const TEMPLATE_BUDGETS = { jogo: 10, periodo: 20, destaque: 64, bagre: 64, destaque_resumo: 60, bagre_resumo: 60, partidas: 6, vitorias: 6, derrotas: 6 };
+const TEMPLATE_BUDGETS = { jogo: 10, periodo: 20, destaque_titulo: 20, bagre_titulo: 22, destaque: 64, bagre: 64, destaque_resumo: 60, bagre_resumo: 60, partidas: 6, vitorias: 6, derrotas: 6 };
 const LINE_BUDGETS = {
   posicao: 4, player: 64, nick: 64, partidas: 4, partidas_texto: 15, vitorias: 4, derrotas: 4, empates: 4,
   placar: 20, winrate: 5, kda: 12,
@@ -208,18 +214,17 @@ const HIGHLIGHT_PHRASES = {
     'KDA {{kda}} e {{winrate}} de vitória. Farmou kill enquanto a partida ia embora.',
     'O grupo tá numa fase tão vergonhosa que o destaque perdeu {{derrotas}} de {{partidas}}. KDA {{kda}} não paga essa conta.',
   ],
-  destaque_carregado: [
-    'Destaque pelas vitórias, porque com KDA {{kda}} só pode ter sido carregado. Agradece o time, {{nick}}.',
-    '{{placar}} com KDA {{kda}}. Ganhou de mochila nas costas dos outros.',
-    'O placar diz destaque, o KDA {{kda}} diz passageiro. Pagou a passagem pelo menos, {{nick}}?',
+  menos_bagre_carona: [
+    'Não ganhou destaque, ganhou carona: {{placar}} com KDA {{kda}}. O time te arrastou até o topo, {{nick}}.',
     '{{vitorias}} vitórias morrendo mais do que matando. Isso não é carry, é carona.',
-    'Destaque com KDA {{kda}}. O grupo tá tão ruim que até o carregado ganhou medalha.',
+    'O placar diz primeiro lugar, o KDA {{kda}} diz passageiro. Pagou a passagem pelo menos, {{nick}}?',
+    'Primeiro do ranking com KDA {{kda}}. Destaque não, só o bagre que teve mais sorte no matchmaking.',
   ],
-  destaque_menos_pior: [
-    'Destaque por ser o menos pior: {{placar}} e KDA {{kda}}. Que semana vergonhosa, grupo.',
-    'Ninguém prestou, então sobrou pro {{nick}}. {{placar}} e KDA {{kda}} levaram a medalha de lata.',
-    'Com {{placar}} e KDA {{kda}}, ser destaque aqui é ganhar concurso de quem caiu menos da escada.',
-    'Medalha de consolação pro {{nick}}. Nem ele merecia, mas os outros mereciam menos.',
+  menos_bagre_fraco: [
+    'Ninguém mereceu destaque. {{nick}} só foi o menos bagre: {{placar}} e KDA {{kda}}.',
+    'Medalha de lata pro {{nick}}. Nem ele merecia, mas os outros mereciam menos.',
+    'Com {{placar}} e KDA {{kda}}, ser primeiro aqui é ganhar concurso de quem caiu menos da escada.',
+    'Semana tão vergonhosa que o melhor do grupo fez {{placar}}. Destaque fica guardado pra quando alguém jogar.',
   ],
   bagre_completo: [
     'Bagre completo: {{placar}} e KDA {{kda}}. Perdeu e ainda deu kill de graça pro inimigo.',
@@ -252,8 +257,8 @@ const DEFAULT_WEEKLY_CONFIG = {
     '📅 RESUMO SEMANAL — {{jogo}}', 'Semana de {{periodo}}',
     '🎮 Grupo: {{partidas}} partidas · {{vitorias}}V {{derrotas}}D', '',
     '{{ranking}}', '',
-    '🏆 Destaque: {{destaque}} ({{destaque_resumo}})', '{{destaque_motivo}}', '',
-    '🐟 Bagre da semana: {{bagre}} ({{bagre_resumo}})', '{{bagre_motivo}}',
+    '{{destaque_titulo}}: {{destaque}} ({{destaque_resumo}})', '{{destaque_motivo}}', '',
+    '{{bagre_titulo}}: {{bagre}} ({{bagre_resumo}})', '{{bagre_motivo}}',
   ].join('\n'),
   line: '{{posicao}} {{player}} — {{partidas_texto}} · {{placar}} ({{winrate}}) · KDA {{kda}}\n{{zoeira}}',
   inactiveLine: WEEKLY_CONFIG_V1.inactiveLine,
@@ -415,16 +420,76 @@ export function weeklyScore(stats) {
   const winrate = stats.winrate ?? 0.5;
   return winrate / 2 + Math.min(stats.kda, WEEKLY_RULES.scoreKdaCap) / WEEKLY_RULES.scoreKdaCap / 2;
 }
-/** Motivo do destaque ou do bagre, pelos eixos vitórias ≥ 50% e KDA ≥ 1. */
+/** Motivo do primeiro (destaque com mérito ou menos bagre) e do último do ranking. */
 export function highlightReason(stats, kind) {
   const winning = (stats.winrate ?? 0.5) >= 0.5;
   const kdaOk = stats.kda >= 1;
   if (kind === 'destaque') {
-    if (winning) return kdaOk ? 'destaque_completo' : 'destaque_carregado';
-    return kdaOk ? 'destaque_kda' : 'destaque_menos_pior';
+    if (winning && stats.kda >= WEEKLY_RULES.destaqueMinKda) return 'destaque_completo';
+    if (!winning && stats.kda >= WEEKLY_RULES.destaqueKdaAlone) return 'destaque_kda';
+    return winning ? 'menos_bagre_carona' : 'menos_bagre_fraco';
   }
   if (winning) return kdaOk ? 'bagre_lanterna' : 'bagre_carona';
   return kdaOk ? 'bagre_derrotas' : 'bagre_completo';
+}
+
+/** O primeiro só é "destaque" com mérito; sem ele, os títulos viram "O menos bagre" e "O maior bagre". */
+export const isRealHighlight = reason => reason === 'destaque_completo' || reason === 'destaque_kda';
+export const WEEKLY_TITLES = {
+  destaque: '🏆 Destaque', menos_bagre: '🥴 O menos bagre', bagre: '🐟 Bagre da semana', maior_bagre: '🐡 O maior bagre',
+};
+
+/**
+ * Classificação da semana guardada na plataforma (não é enviada): posição, faixa, nota e título de cada
+ * jogador, inclusive de quem sumiu. Retorna null quando ninguém jogou.
+ */
+export function weeklyStandings(summaries) {
+  if (!summaries.some(stats => stats.games > 0)) return null;
+  const { active, inactive } = rankWeek(summaries.slice(0, WEEKLY_MAX_PLAYERS));
+  const topReason = active[0] ? highlightReason(active[0], 'destaque') : null;
+  const merit = isRealHighlight(topReason);
+  const bottom = active.length >= 2 ? active.at(-1) : null;
+  const titleOf = stats => {
+    if (stats === active[0]) return merit ? 'destaque' : 'menos_bagre';
+    if (stats === bottom) return merit ? 'bagre' : 'maior_bagre';
+    return null;
+  };
+  return {
+    merit,
+    players: [...active, ...inactive].map((stats, index) => ({
+      playerId: stats.playerId, name: stats.name, position: index + 1, band: stats.band, title: titleOf(stats),
+      reason: stats === active[0] ? topReason : stats === bottom ? highlightReason(stats, 'bagre') : null,
+      score: stats.band === 'sumido' ? null : Math.round(stats.score * 1000) / 1000,
+      games: stats.games, wins: stats.wins, losses: stats.losses, draws: stats.draws,
+      kills: stats.kills, deaths: stats.deaths, assists: stats.assists,
+    })),
+  };
+}
+
+/** Ranking histórico por jogador, somando as semanas guardadas: quantas vezes foi destaque, bagre etc. */
+export function weeklyHall(standings) {
+  const byPlayer = new Map();
+  for (const week of standings) {
+    for (const entry of week.players || []) {
+      const row = byPlayer.get(entry.playerId) || {
+        playerId: entry.playerId, name: entry.name, weeks: 0, played: 0,
+        destaque: 0, menos_bagre: 0, bagre: 0, maior_bagre: 0, sumido: 0, elogio: 0,
+        games: 0, wins: 0, losses: 0, draws: 0, kills: 0, deaths: 0, assists: 0, lastWeek: '',
+      };
+      if (String(week.weekKey) >= row.lastWeek) { row.name = entry.name; row.lastWeek = String(week.weekKey); }
+      row.weeks += 1;
+      if (entry.band === 'sumido') row.sumido += 1; else row.played += 1;
+      if (entry.band === 'elogio') row.elogio += 1;
+      if (entry.title) row[entry.title] += 1;
+      for (const key of ['games', 'wins', 'losses', 'draws', 'kills', 'deaths', 'assists']) row[key] += Number(entry[key]) || 0;
+      byPlayer.set(entry.playerId, row);
+    }
+  }
+  return [...byPlayer.values()].map(({ lastWeek, ...row }) => ({
+    ...row, kda: (row.kills + row.assists) / Math.max(1, row.deaths),
+    winrate: row.wins + row.losses ? row.wins / (row.wins + row.losses) : null,
+  })).sort((a, b) => b.destaque - a.destaque || a.bagre + a.maior_bagre - (b.bagre + b.maior_bagre)
+    || b.wins - a.wins || a.name.localeCompare(b.name));
 }
 
 function rankWeek(summaries) {
@@ -535,10 +600,13 @@ export function renderWeeklyReport({ game, summaries, period, seed, config }) {
   };
   const top = highlight(active[0], 'destaque');
   const bottom = highlight(active.length >= 2 ? active.at(-1) : null, 'bagre');
+  const merit = isRealHighlight(top.reason);
   const body = render(selected.template, {
     jogo: GAME_LABELS[game] || 'LOL',
     periodo: period,
     ranking: lines.join('\n\n'),
+    destaque_titulo: merit || !active[0] ? WEEKLY_TITLES.destaque : WEEKLY_TITLES.menos_bagre,
+    bagre_titulo: merit || !active[0] ? WEEKLY_TITLES.bagre : WEEKLY_TITLES.maior_bagre,
     destaque: active[0]?.name || '—',
     destaque_motivo: top.motivo,
     destaque_resumo: top.resumo,
@@ -554,8 +622,8 @@ export function renderWeeklyReport({ game, summaries, period, seed, config }) {
   if (message.length > 10000) throw new MessageConfigError('O resumo semanal excede 10.000 caracteres. Encurte o modelo ou as frases.');
   return {
     message, players,
-    highlight: active[0] ? { playerId: active[0].playerId, reason: top.reason } : null,
-    bagre: active.length >= 2 ? { playerId: active.at(-1).playerId, reason: bottom.reason } : null,
+    highlight: active[0] ? { playerId: active[0].playerId, reason: top.reason, title: merit ? 'destaque' : 'menos_bagre' } : null,
+    bagre: active.length >= 2 ? { playerId: active.at(-1).playerId, reason: bottom.reason, title: merit ? 'bagre' : 'maior_bagre' } : null,
   };
 }
 
