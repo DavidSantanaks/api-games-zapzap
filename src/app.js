@@ -9,7 +9,7 @@ import { R6Client } from './r6.js';
 import { GAMES, isGame, messagesFor } from './games.js';
 import {
   WEEKLY_BANDS, WEEKLY_LINE_VARIABLES, WEEKLY_PHRASE_GROUPS, WEEKLY_RULES, WEEKLY_TEMPLATE_VARIABLES, currentWeeklyWindow,
-  exampleWeekSummaries, getDefaultWeeklyConfig, lastWeeklyWindow, renderWeeklyReport, summarizeWeek, validateWeeklyConfig,
+  WEEKLY_TITLES, exampleWeekSummaries, getDefaultWeeklyConfig, weeklyHall, lastWeeklyWindow, renderWeeklyReport, summarizeWeek, validateWeeklyConfig,
 } from './weekly.js';
 
 class HttpError extends Error {
@@ -385,6 +385,19 @@ export function createApp({ store, riot, cs2 = new Cs2Client(), r6 = new R6Clien
       message: report?.message || null,
       players: report?.players || [],
       empty: !report,
+    });
+  });
+  // Ranking histórico guardado na plataforma (não é enviado ao grupo).
+  app.get('/api/weekly/hall', (req, res) => {
+    const game = parseGame(req.query.game);
+    const weeks = store.weeklyStandings(game).filter(week => week.players.length);
+    res.json({
+      game, titles: WEEKLY_TITLES, weeks: weeks.length, hall: weeklyHall(weeks),
+      recent: weeks.slice(0, 12).map(week => ({
+        weekKey: week.weekKey, period: week.period, merit: week.merit,
+        destaque: week.players.find(entry => entry.title === 'destaque' || entry.title === 'menos_bagre') || null,
+        bagre: week.players.find(entry => entry.title === 'bagre' || entry.title === 'maior_bagre') || null,
+      })),
     });
   });
   app.post('/api/weekly/reports/:id/retry', (req, res) => {

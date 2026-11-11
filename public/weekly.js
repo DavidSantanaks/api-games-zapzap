@@ -144,6 +144,63 @@
     }));
   }
 
+  // Ranking histórico guardado no servidor: só leitura, nunca envia nada ao grupo.
+  let hallRequest = 0;
+  async function loadHall() {
+    const request = ++hallRequest;
+    const target = game;
+    $('weekly-hall-game').textContent = gameLabel(target);
+    try {
+      const data = await api(`/api/weekly/hall?game=${encodeURIComponent(target)}`);
+      if (request === hallRequest) renderHall(data);
+    } catch (error) {
+      if (request === hallRequest) $('weekly-hall-body').replaceChildren(hallMessage('Não foi possível carregar o ranking histórico.'));
+    }
+  }
+  function hallMessage(text) {
+    const row = el('tr');
+    const cell = el('td', 'count-label', text);
+    cell.colSpan = 10;
+    row.append(cell);
+    return row;
+  }
+  function renderHall(data) {
+    const body = $('weekly-hall-body');
+    const leaders = $('weekly-hall-leaders');
+    const recent = $('weekly-hall-recent');
+    recent.replaceChildren();
+    if (!data.hall.length) {
+      leaders.textContent = '';
+      body.replaceChildren(hallMessage('Nenhuma semana encerrada com partidas ainda. A primeira entra depois do próximo horário do resumo.'));
+      return;
+    }
+    const leader = (key, label) => {
+      const top = [...data.hall].sort((a, b) => b[key] - a[key])[0];
+      return top && top[key] ? `${label}: ${top.name} (${top[key]}x)` : null;
+    };
+    leaders.textContent = [
+      `${data.weeks} ${data.weeks === 1 ? 'semana' : 'semanas'} guardadas`,
+      leader('destaque', '🏆 Mais destaques'), leader('menos_bagre', '🥴 Mais vezes o menos bagre'),
+      leader('bagre', '🐟 Mais vezes bagre'), leader('maior_bagre', '🐡 Mais vezes o maior bagre'),
+      leader('sumido', '💤 Mais sumido'),
+    ].filter(Boolean).join(' · ');
+    const decimal = value => value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    body.replaceChildren(...data.hall.map(row => {
+      const tr = el('tr');
+      const name = el('td', '', row.name);
+      name.title = row.name;
+      tr.append(name, ...[row.destaque, row.menos_bagre, row.bagre, row.maior_bagre, row.sumido, row.weeks, row.games,
+        `${row.wins}-${row.losses}${row.draws ? `-${row.draws}` : ''}`, decimal(row.kda)].map(value => el('td', '', String(value))));
+      return tr;
+    }));
+    for (const week of data.recent.slice(0, 6)) {
+      const parts = [`Semana ${week.period}`];
+      if (week.destaque) parts.push(`${week.merit ? data.titles.destaque : data.titles.menos_bagre}: ${week.destaque.name}`);
+      if (week.bagre) parts.push(`${week.merit ? data.titles.bagre : data.titles.maior_bagre}: ${week.bagre.name}`);
+      recent.append(el('span', '', parts.join(' · ')));
+    }
+  }
+
   function insert(text) {
     const input = focusedInput || $('weekly-template');
     const start = input.selectionStart ?? input.value.length;
@@ -196,6 +253,7 @@
       $('weekly-toggle').disabled = false;
       renderSchedule();
       renderHistory();
+      loadHall();
       if (firstLoad) {
         renderBands();
         renderVariables();
@@ -212,6 +270,7 @@
     game = value === 'cs2' || value === 'r6' ? value : 'lol';
     $('weekly-eyebrow').textContent = `O BALANÇO DA SEMANA · ${gameLabel(game)}`;
     schedulePreview();
+    loadHall();
   }
 
   function bind() {
@@ -272,6 +331,7 @@
       } catch (error) { toast(error.message, true); }
     });
     $('weekly-refresh').addEventListener('click', () => load({ keepDraft: true }));
+    $('weekly-hall-refresh').addEventListener('click', loadHall);
     $('weekly-retry-load').addEventListener('click', () => load());
     document.addEventListener('game-tab-changed', event => setGame(event.detail?.game));
     setInterval(() => { if (!document.hidden) load({ keepDraft: true }); }, 60_000);

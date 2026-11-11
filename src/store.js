@@ -46,6 +46,9 @@ export class Store {
         status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL DEFAULT 0,
         payload TEXT NOT NULL, UNIQUE(game, week_key)
       );
+      CREATE TABLE IF NOT EXISTS weekly_standings (
+        game TEXT NOT NULL, week_key TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(game, week_key)
+      );
     `);
     this.db.prepare('INSERT OR IGNORE INTO weekly_config (id,payload) VALUES (1,?)').run(JSON.stringify(getDefaultWeeklyConfig()));
     // Padrão antigo nunca editado recebe a versão atual; configuração editada só ganha as frases novas
@@ -240,6 +243,28 @@ export class Store {
     return this.db.prepare(`SELECT game,payload FROM matches WHERE game=?
       AND json_extract(payload,'$.createdAt') > ? AND json_extract(payload,'$.createdAt') <= ?`)
       .all(game, new Date(start).toISOString(), new Date(end).toISOString()).map(parse);
+  }
+  /** Classificação guardada de cada semana (não é enviada); `players` vazio marca semana sem partidas. */
+  hasWeeklyStanding(game, weekKey) {
+    return Boolean(this.db.prepare('SELECT 1 FROM weekly_standings WHERE game=? AND week_key=?').get(game, weekKey));
+  }
+  addWeeklyStanding({ game, weekKey, period, start, end, merit = false, players = [] }) {
+    const entry = {
+      game, weekKey, period, start: new Date(start).toISOString(), end: new Date(end).toISOString(),
+      merit, players, createdAt: new Date().toISOString(),
+    };
+    const result = this.db.prepare('INSERT OR IGNORE INTO weekly_standings (game,week_key,payload) VALUES (?,?,?)')
+      .run(game, weekKey, JSON.stringify(entry));
+    return result.changes ? entry : null;
+  }
+  weeklyStandings(game, limit = 520) {
+    return this.db.prepare('SELECT payload FROM weekly_standings WHERE game=? ORDER BY week_key DESC LIMIT ?')
+      .all(game, limit).map(row => JSON.parse(row.payload));
+  }
+  /** Primeira detecção de partida do jogo, para montar a classificação das semanas anteriores. */
+  firstMatchDetectedAt(game) {
+    const row = this.db.prepare("SELECT MIN(json_extract(payload,'$.createdAt')) AS first FROM matches WHERE game=?").get(game);
+    return row?.first ? Date.parse(row.first) : null;
   }
   weeklyConfig() { return JSON.parse(this.db.prepare('SELECT payload FROM weekly_config WHERE id=1').get().payload); }
   updateWeeklyConfig(config) {

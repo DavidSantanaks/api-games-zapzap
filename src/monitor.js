@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { formatMessage } from './message.js';
 import { GAME_IDS, messagesFor } from './games.js';
-import { dueWeeklyWindow, renderWeeklyReport, summarizeWeek } from './weekly.js';
+import { dueWeeklyWindow, lastWeeklyWindow, renderWeeklyReport, summarizeWeek, weeklyStandings } from './weekly.js';
 
 const RIOT_MISSING = 'Configure RIOT_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 const R6_MISSING = 'Configure STATS_CC_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
@@ -73,6 +73,8 @@ export class Monitor {
           if (error.retryAfterMs > 0) rateLimited.add(game);
         }
       }
+      try { this.recordWeeklyStandings(); }
+      catch (error) { this.logger.error({ err: error.message }, 'Falha ao guardar a classificação semanal'); }
       try { this.generateWeeklyReports(); }
       catch (error) { this.logger.error({ err: error.message }, 'Falha ao gerar o resumo semanal'); }
       await this.deliver();
@@ -189,6 +191,33 @@ export class Monitor {
       // O cursor avança partida a partida: uma falha no meio não reenvia nem perde as anteriores.
       this.store.updatePlayer(player.id, { lastSeenMatchId: id });
     }
+  }
+  /**
+   * Guarda a classificação de cada semana encerrada, por jogo, independentemente do envio do resumo.
+   * Na primeira vez, preenche também as semanas anteriores desde a primeira partida detectada (até 2 anos).
+   */
+  recordWeeklyStandings() {
+    const settings = this.store.settings();
+    const schedule = { weeklyDay: settings.weeklyDay, weeklyHour: settings.weeklyHour };
+    const recorded = [];
+    for (const game of GAME_IDS) {
+      const first = this.store.firstMatchDetectedAt(game);
+      if (first === null) continue;
+      const players = this.store.players(game).filter(player => player.enabled);
+      let week = lastWeeklyWindow(this.now(), schedule);
+      for (let count = 0; count < 104 && week.end > first; count++) {
+        if (!this.store.hasWeeklyStanding(game, week.key)) {
+          const standing = weeklyStandings(summarizeWeek(players, this.store.matchesDetectedBetween(game, week.start, week.end)));
+          const entry = this.store.addWeeklyStanding({
+            game, weekKey: week.key, period: week.period, start: week.start, end: week.end,
+            merit: standing?.merit ?? false, players: standing?.players ?? [],
+          });
+          if (entry && standing) recorded.push(entry);
+        }
+        week = lastWeeklyWindow(week.end - 1, schedule);
+      }
+    }
+    return recorded;
   }
   /**
    * Gera, uma única vez por jogo e semana, o resumo das partidas detectadas na semana encerrada.
