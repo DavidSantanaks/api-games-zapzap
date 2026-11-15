@@ -1,4 +1,4 @@
-import { gameModeLabel } from './game-mode.js';
+import { gameModeLabel, isIgnoredLolMode } from './game-mode.js';
 import { nonempty, number, retryDelay } from './http.js';
 
 const REGIONS = new Set(['americas', 'europe', 'asia', 'sea']);
@@ -110,6 +110,8 @@ export class RiotClient {
     if (!info || !Array.isArray(info.participants)) throw new RiotError('A Riot retornou dados incompletos da partida.');
     // Custom matches must not be shared without explicit player opt-in. This MVP skips them.
     if (info.queueId === 0) return null;
+    // Arena não gera mensagem: o cursor avança e a partida não é guardada.
+    if (isIgnoredLolMode(info)) return null;
     const participant = info.participants.find(item => item.puuid === player.puuid);
     if (!participant) throw new RiotError('O jogador não foi encontrado nos dados dessa partida.');
     const duration = durationSeconds(info);

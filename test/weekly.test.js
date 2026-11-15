@@ -366,3 +366,42 @@ test('weekly standings are stored every closed week, even with the summary off, 
   assert.equal(row('Bagre#BR1').bagre, 1);
   assert.equal(hall[0].name, 'Amigo#BR1');
 });
+
+test('LoL Arena matches stay out of the weekly count; old queued Arena messages are cancelled once', async t => {
+  const amigo = { id: 'a', game: 'lol', gameName: 'Amigo', tagLine: 'BR1' };
+  const base = { playerId: 'a', playerName: 'Amigo#BR1', kills: 5, deaths: 5, assists: 5, endedAt: '2026-11-10T00:00:00Z' };
+  const [summary] = summarizeWeek([amigo], [
+    { ...base, win: true, queueId: 420 },
+    { ...base, win: false, queueId: 1700, gameMode: 'CHERRY' },
+    { ...base, win: false, queueId: 1710 },
+    { ...base, win: false, gameMode: 'CHERRY' },
+  ]);
+  assert.deepEqual([summary.games, summary.wins, summary.losses], [1, 1, 0]);
+
+  const { DatabaseSync } = await import('node:sqlite');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'gg-arena-'));
+  const file = join(dir, 'gg.db');
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  let store = new Store(file);
+  const player = store.addPlayer({ puuid: 'puuid-ficticio', gameName: 'Amigo', tagLine: 'BR1' }, 'americas', null);
+  const arena = store.addMatch(player, { id: 'BR1_arena', playerName: 'Amigo#BR1', win: false, queueId: 1700, gameMode: 'CHERRY', endedAt: '2026-11-10T00:00:00Z' }, 'msg', GROUP);
+  const ranked = store.addMatch(player, { id: 'BR1_ranked', playerName: 'Amigo#BR1', win: true, queueId: 420, endedAt: '2026-11-10T01:00:00Z' }, 'msg', GROUP);
+  store.addWeeklyStanding({ game: 'lol', weekKey: '2026-11-08', period: 'x', start: 0, end: 1, players: [{ playerId: player.id }] });
+  store.addWeeklyStanding({ game: 'cs2', weekKey: '2026-11-08', period: 'x', start: 0, end: 1, players: [] });
+  store.close();
+  // Simula a instalação anterior ao filtro: a migração ainda não rodou.
+  const raw = new DatabaseSync(file);
+  raw.prepare("DELETE FROM app_migrations WHERE name='lol-ignore-arena-v1'").run();
+  raw.close();
+  store = new Store(file);
+  try {
+    assert.equal(store.match(arena.id).status, 'skipped');
+    assert.equal(store.match(ranked.id).status, 'pending', 'outras partidas na fila continuam');
+    assert.deepEqual(store.dueDeliveries().map(entry => entry.riotMatchId), ['BR1_ranked']);
+    assert.equal(store.weeklyStandings('lol').length, 0, 'classificação do LoL será refeita sem Arena');
+    assert.equal(store.weeklyStandings('cs2').length, 1, 'outros jogos ficam intactos');
+  } finally { store.close(); }
+});

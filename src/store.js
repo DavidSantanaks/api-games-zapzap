@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getDefaultMessageConfig, getLegacyPhrasePools, validateMessageConfig } from './message.js';
 import { GAME_IDS, messagesFor } from './games.js';
+import { isIgnoredLolMode } from './game-mode.js';
 import { getDefaultWeeklyConfig, upgradeWeeklyConfig, validateWeeklyConfig } from './weekly.js';
 
 // Campos adicionados depois da primeira versão: instalações antigas recebem o padrão ao ler.
@@ -105,6 +106,16 @@ export class Store {
       }
       if (updated) this.updateMessageConfig({ ...current, phrases });
       this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('message-kda-bands-v1');
+    }
+    // Arena saiu do LoL (15/11/2026): envios pendentes dessas partidas são cancelados (o histórico fica) e a
+    // classificação semanal do LoL, que é derivada das partidas, é refeita sem elas pelo monitor.
+    if (!this.db.prepare('SELECT 1 FROM app_migrations WHERE name=?').get('lol-ignore-arena-v1')) {
+      for (const row of this.db.prepare("SELECT game,payload FROM matches WHERE game='lol' AND status IN ('pending','failed')").all()) {
+        const entry = parse(row);
+        if (isIgnoredLolMode(entry)) this.updateDelivery(entry.id, { status: 'skipped', error: 'Modo Arena não é enviado.' });
+      }
+      this.db.prepare("DELETE FROM weekly_standings WHERE game='lol'").run();
+      this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('lol-ignore-arena-v1');
     }
     // Frases mais ácidas (10/11/2026): só troca categorias idênticas a um padrão antigo, em cada jogo.
     if (!this.db.prepare('SELECT 1 FROM app_migrations WHERE name=?').get('message-acid-phrases-v1')) {

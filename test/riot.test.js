@@ -133,3 +133,10 @@ test('maps auth, not-found, unavailable and network errors without exposing upst
   const client = new RiotClient({ apiKey: 'secret-key', fetchImpl: async () => { throw new Error('secret-key'); } });
   await assert.rejects(client.matchIds(player), error => /conexão/.test(error.message) && !error.message.includes('secret-key'));
 });
+
+test('Arena (queues 1700/1710, mode CHERRY) is skipped like custom games', async () => {
+  assert.equal(await clientWith(fixture({ queueId: 1700, gameMode: 'CHERRY' })).match(player, 'BR1_arena'), null);
+  assert.equal(await clientWith(fixture({ queueId: 1710, gameMode: 'CHERRY' })).match(player, 'BR1_arena2'), null);
+  assert.equal(await clientWith(fixture({ queueId: 999999, gameMode: 'cherry' })).match(player, 'BR1_arena3'), null);
+  assert.equal((await clientWith(fixture({ queueId: 450, gameMode: 'ARAM', mapId: 12 })).match(player, 'BR1_aram')).mode, 'ARAM');
+});

@@ -20,7 +20,7 @@
   const regions = { americas: 'Américas', europe: 'Europa', asia: 'Ásia', sea: 'Sudeste Asiático / Oceania' };
   const isGameId = game => game === 'lol' || game === 'cs2' || game === 'r6';
   let r6PlatformsLoaded = false;
-  const statusLabels = { pending: 'Na fila', sent: 'Enviada', failed: 'Falha no envio' };
+  const statusLabels = { pending: 'Na fila', sent: 'Enviada', failed: 'Falha no envio', skipped: 'Não enviada' };
   const dates = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   function el(tag, className, text) {

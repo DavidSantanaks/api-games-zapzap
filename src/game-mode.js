@@ -32,6 +32,17 @@ const MODE_LABELS = new Map([
   ['BRAWL', 'Brawl'], ['CHERRY', 'Arena'], ['STRAWBERRY', 'Enxame'],
 ]);
 
+// Modos do LoL que não geram mensagem nem entram no resumo semanal (pedido do usuário em 15/11/2026).
+const IGNORED_QUEUES = new Set([1700, 1710]);
+const IGNORED_MODES = new Set(['CHERRY']);
+
+/** Arena (filas 1700/1710, modo CHERRY) fica fora das mensagens e da contagem semanal. */
+export function isIgnoredLolMode(match = {}) {
+  const queueId = Number(match.queueId);
+  if (Number.isSafeInteger(queueId) && IGNORED_QUEUES.has(queueId)) return true;
+  return typeof match.gameMode === 'string' && IGNORED_MODES.has(match.gameMode.trim().toUpperCase());
+}
+
 /** Also resolves older stored matches which only contain queueId. */
 export function gameModeLabel(match = {}) {
   const rawQueue = match.queueId;
