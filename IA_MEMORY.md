@@ -21,7 +21,7 @@ Atualizada em **10/11/2026**. Leia este arquivo e o [README](README.md) antes de
 - Monitor periódico configurável: padrão de 120 segundos, mínimo de 30; começa pausado na instalação nova.
 - Baseline no cadastro para não enviar o histórico anterior; partidas em andamento podem aparecer depois de encerradas.
 - Histórico paginado após períodos offline, consultas sequenciais, ciclos sem sobreposição e tratamento isolado de `Retry-After` por jogo (um `429` na Riot não bloqueia CS2 nem envios pendentes no WhatsApp).
-- Estatísticas normalizadas de LoL: resultado, campeão, K/D/A, farm (`farm` soma tropas e monstros neutros), lane, ouro, duração e modo de jogo. Partidas customizadas são ignoradas nesta versão.
+- Estatísticas normalizadas de LoL: resultado, campeão, K/D/A, farm (`farm` soma tropas e monstros neutros), lane, ouro, duração e modo de jogo. Partidas customizadas são ignoradas nesta versão. **Arena** (filas 1700/1710, modo `CHERRY`) também é ignorada desde 15/11/2026, a pedido do usuário (`isIgnoredLolMode` em `src/game-mode.js`): não gera mensagem, não entra no resumo semanal nem no ranking histórico. A migração única `lol-ignore-arena-v1` marcou envios pendentes de Arena como `skipped` (“Não enviada”, histórico preservado) e apagou a classificação semanal do LoL, que o monitor refaz sem Arena.
 - WhatsApp por QR Code, lista de grupos, sessão persistente, reconexão e desconexão pela interface.
 - Fila persistente com uma entrada por partida/jogador, tentativas com espera crescente e até cinco tentativas automáticas.
 - Repetição manual de envios com falha e ID estável de mensagem para reduzir duplicação nas tentativas.

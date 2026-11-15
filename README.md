@@ -280,6 +280,7 @@ O R6 usa a [API da stats.cc](https://api.stats.cc/siege/docs) (`https://api.stat
 - **League of Legends (Riot):** resolve `nick#tag` em PUUID pela Account-v1, consulta a Match-v5 e extrai resultado, campeão, kills/deaths/assists, CS (tropas + monstros neutros), lane e gold. [Documentação oficial](https://developer.riotgames.com/docs/lol).
 - **Counter-Strike 2 (Steam + Leetify):** valida o `SteamID64`, avança os códigos `CSGO-...` via `GetNextMatchSharingCode` (ou consulta o histórico público) e coleta as estatísticas das demos. No histórico, partidas com ID público têm link para conferência no Leetify.
 - **Rainbow Six Siege (stats.cc):** resolve plataforma + nick no `profile_id`, consulta só as partidas novas e extrai resultado, mapa, placar, K/D/A, headshots, aberturas, clutches, rank e pontos. Veja [Rainbow Six Siege: dados da stats.cc](#rainbow-six-siege-dados-da-statscc).
+- **Modos ignorados no LoL:** personalizadas e **Arena** não geram mensagem nem contam no resumo semanal.
 - **Só partidas novas:** ao cadastrar um player, o histórico atual vira referência. Partidas anteriores são ignoradas; as que estão em andamento ou com demo em processamento entram quando concluídas.
 
 <details>
