@@ -30,9 +30,9 @@ test('normalizes a ranked match from stats.cc without inventing missing fields',
   assert.equal(match.rankPointsDelta, 23);
   // Time 1 lê o placar invertido.
   assert.equal(normalizeR6Match(r6Item(M1, {}, { team: 1 })).score, '2 x 4');
-  // Sem sessão ranqueada (Padrão) e sem headshots: nada é estimado.
-  const unranked = normalizeR6Match(r6Item(M2, { playlist: 'unranked', ranked_session: null, map: 'oregon' }, { headshots: null }));
-  assert.equal(unranked.mode, 'Padrão');
+  // Sem sessão de rank e sem headshots: nada é estimado.
+  const unranked = normalizeR6Match(r6Item(M2, { playlist: 'legend-division', ranked_session: null, legend_session: null, map: 'oregon' }, { headshots: null }));
+  assert.equal(unranked.mode, 'Legend Division');
   assert.equal(unranked.rankLabel, null);
   assert.equal(unranked.rankPointsDelta, null);
   assert.equal(unranked.headshotPercent, null);
@@ -40,7 +40,8 @@ test('normalizes a ranked match from stats.cc without inventing missing fields',
   assert.equal(slugLabel('kafe-dostoyevsky'), 'Kafe Dostoyevsky');
 });
 
-test('only ranked, unranked and legend-division count; canceled matches are ignored', () => {
+test('only ranked and legend-division count; Padrão (unranked) and canceled matches are ignored', () => {
+  assert.equal(normalizeR6Match(r6Item(M1, { playlist: 'unranked', ranked_session: null })), null, 'Padrão não gera mensagem');
   assert.equal(normalizeR6Match(r6Item(M1, { playlist: 'legend-division', ranked_session: null, legend_session: { rank: 'v7-champion-i', rank_points: 5000, rank_points_delta: -12 } })).mode, 'Legend Division');
   for (const playlist of ['quick-match', 'event', 'arcade', 'custom', 'training', 'dual-front', 'pve-casual-game']) {
     assert.equal(normalizeR6Match(r6Item(M1, { playlist })), null, playlist);

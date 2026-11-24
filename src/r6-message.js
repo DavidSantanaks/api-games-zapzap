@@ -14,7 +14,7 @@ const present = value => value !== null && value !== undefined && Number.isFinit
 
 export const R6_MESSAGE_VARIABLES = [
   { key: 'jogo', label: 'Jogo', description: 'Nome do jogo da partida.', example: 'R6' },
-  { key: 'modo', label: 'Modo de jogo', description: 'Ranqueada, Padrão ou Legend Division.', example: 'Ranqueada' },
+  { key: 'modo', label: 'Modo de jogo', description: 'Ranqueada ou Legend Division.', example: 'Ranqueada' },
   { key: 'resultado', label: 'Resultado', description: 'Vitória, derrota, empate, abandono ou rendição do jogador.', example: 'DERROTA' },
   { key: 'resultado_emoji', label: 'Emoji do resultado', description: '🟢 para vitória, 🔴 para derrota ou abandono e 🟡 para empate.', example: '🔴' },
   { key: 'player', label: 'Player', description: 'Nick do jogador na partida.', example: 'SeuAmigo' },

@@ -145,7 +145,7 @@
     $('brand-subtitle').textContent = isR6 ? 'DO RAPEL PRO GRUPO' : isCs2 ? 'DO BOMB PRO GRUPO' : 'DO NEXUS PRO GRUPO';
     $('preview-game-tag').textContent = isR6 ? 'EXEMPLO · R6' : isCs2 ? 'EXEMPLO · CS2' : 'EXEMPLO';
     $('players-footnote-text').textContent = isR6
-      ? 'Ao cadastrar, a partida mais recente vira referência. Só novas partidas Ranqueada, Padrão e Legend Division geram mensagens (Data by Stats.cc).'
+      ? 'Ao cadastrar, a partida mais recente vira referência. Só novas partidas Ranqueada e Legend Division geram mensagens (Data by Stats.cc).'
       : isCs2
         ? 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas Premier e Competitivo geram mensagens (dados via Steam e Leetify).'
         : 'Ao cadastrar, o histórico anterior vira referência. Só novas partidas geram mensagens.';

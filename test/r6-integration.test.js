@@ -192,3 +192,60 @@ test('existing databases gain the R6 message config without touching LoL or CS2 
   assert.equal(store.messageConfig('cs2').templates[0].text, 'Texto personalizado do CS2 {{zoeira}}');
   assert.deepEqual(store.messageConfig('r6').templates.map(template => template.id), ['resumo-completo', 'placar-do-grupo', 'pos-game']);
 });
+
+test('Padrão (unranked) is not sent and not counted; stored Padrão messages are cancelled once', async t => {
+  const { summarizeWeek } = await import('../src/weekly.js');
+  const { DatabaseSync } = await import('node:sqlite');
+  const dir = mkdtempSync(join(tmpdir(), 'gg-r6-ranked-'));
+  const dbPath = join(dir, 'gg-report.sqlite');
+  let store = new Store(dbPath);
+  t.after(() => {
+    store.close();
+    for (const suffix of ['', '-wal', '-shm']) if (existsSync(dbPath + suffix)) unlinkSync(dbPath + suffix);
+    rmdirSync(dir);
+  });
+  store.updateSettings({ monitoringEnabled: true, whatsappGroupId: GROUP, whatsappGroupName: 'Resenha' });
+  const player = store.addPlayer({ profileId: PROFILE, gameName: 'AmigoR6', platform: 'pc', platformLabel: 'PC' }, 'pc', BASE, 'r6');
+
+  // Coleta: Padrão não vira mensagem, mas o cursor avança; a ranqueada vem normal.
+  const page = [
+    r6Item(NEW2, { ended_at: future(20) }),
+    r6Item(NEW1, { ended_at: future(10), playlist: 'unranked', ranked_session: null }),
+  ];
+  const { fetchImpl } = fakeStatsCc({
+    '/v2/config': [200, CONFIG],
+    [`/v2/profiles/${PROFILE}/matches?limit=20&after=${BASE}`]: [200, page],
+  });
+  const sends = [];
+  const monitor = new Monitor({ store, riot: { configured: false }, r6: new R6Client({ apiKey: KEY, fetchImpl }), whatsapp: connectedWhatsapp(sends), logger: silentLogger });
+  monitor.stopped = false;
+  await monitor.check();
+  assert.deepEqual(store.matches(10, 'r6').map(entry => entry.riotMatchId), [NEW2], 'só a ranqueada é guardada');
+  assert.equal(store.player(player.id).lastSeenMatchId, NEW2);
+  assert.equal(sends.length, 1);
+
+  // Semanal: Padrão já guardado antes do filtro não conta (playlist conhecida fora das ranqueadas).
+  const base = { playerId: player.id, game: 'r6', playerName: 'AmigoR6', kills: 5, deaths: 5, assists: 5, endedAt: '2026-11-10T00:00:00Z' };
+  const [week] = summarizeWeek([player], [
+    { ...base, result: 'win', playlist: 'ranked' }, { ...base, result: 'win', playlist: 'legend-division' },
+    { ...base, result: 'loss', playlist: 'unranked' }, { ...base, result: 'loss' },
+  ]);
+  assert.deepEqual([week.games, week.wins, week.losses], [3, 2, 1], 'Padrão fora; sem playlist (legado) fica');
+
+  // Migração: pendentes de Padrão viram "skipped" uma única vez e o ranking do R6 é refeito.
+  const standing = { game: 'r6', weekKey: '2026-11-08', period: 'x', start: 0, end: 1, players: [{ playerId: player.id }] };
+  store.addWeeklyStanding(standing);
+  store.addWeeklyStanding({ ...standing, game: 'cs2' });
+  const padrao = store.addMatch(player, { id: 'padrao-antigo', playlist: 'unranked', playerName: 'AmigoR6', win: true, endedAt: '2026-11-10T01:00:00Z' }, 'msg', GROUP);
+  const ranked = store.addMatch(player, { id: 'ranked-antiga', playlist: 'ranked', playerName: 'AmigoR6', win: true, endedAt: '2026-11-10T02:00:00Z' }, 'msg', GROUP);
+  store.close();
+  const raw = new DatabaseSync(dbPath);
+  raw.prepare("DELETE FROM app_migrations WHERE name='r6-only-ranked-v1'").run();
+  raw.close();
+  store = new Store(dbPath);
+  assert.equal(store.match(padrao.id).status, 'skipped');
+  assert.equal(store.match(padrao.id).error, 'Só partidas ranqueadas são enviadas.');
+  assert.equal(store.match(ranked.id).status, 'pending');
+  assert.equal(store.weeklyStandings('r6').length, 0);
+  assert.equal(store.weeklyStandings('cs2').length, 1, 'outros jogos ficam intactos');
+});

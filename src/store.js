@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getDefaultMessageConfig, getLegacyPhrasePools, validateMessageConfig } from './message.js';
 import { GAME_IDS, messagesFor } from './games.js';
+import { isIgnoredR6Playlist } from './r6.js';
 import { isIgnoredLolMode } from './game-mode.js';
 import { getDefaultWeeklyConfig, upgradeWeeklyConfig, validateWeeklyConfig } from './weekly.js';
 
@@ -116,6 +117,16 @@ export class Store {
       }
       this.db.prepare("DELETE FROM weekly_standings WHERE game='lol'").run();
       this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('lol-ignore-arena-v1');
+    }
+    // R6 só com ranqueadas (24/11/2026): envios pendentes de partidas Padrão são cancelados (o histórico fica) e a
+    // classificação semanal do R6, derivada das partidas, é refeita sem elas pelo monitor.
+    if (!this.db.prepare('SELECT 1 FROM app_migrations WHERE name=?').get('r6-only-ranked-v1')) {
+      for (const row of this.db.prepare("SELECT game,payload FROM matches WHERE game='r6' AND status IN ('pending','failed')").all()) {
+        const entry = parse(row);
+        if (isIgnoredR6Playlist(entry.playlist)) this.updateDelivery(entry.id, { status: 'skipped', error: 'Só partidas ranqueadas são enviadas.' });
+      }
+      this.db.prepare("DELETE FROM weekly_standings WHERE game='r6'").run();
+      this.db.prepare('INSERT INTO app_migrations(name) VALUES (?)').run('r6-only-ranked-v1');
     }
     // Frases mais ácidas (10/11/2026): só troca categorias idênticas a um padrão antigo, em cada jogo.
     if (!this.db.prepare('SELECT 1 FROM app_migrations WHERE name=?').get('message-acid-phrases-v1')) {

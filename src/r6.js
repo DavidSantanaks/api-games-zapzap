@@ -8,8 +8,13 @@ const CONFIG_TTL_MS = 12 * 60 * 60_000;
 const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MISSING_KEY = 'Configure STATS_CC_API_KEY no arquivo .env. No Docker, aplique com: docker compose up -d --force-recreate. Na execução local, reinicie o app.';
 
-/** Playlists que geram mensagem (decisão do usuário em 10/11/2026). Os nomes em pt-BR valem também sem o config. */
-export const R6_PLAYLISTS = { ranked: 'Ranqueada', unranked: 'Padrão', 'legend-division': 'Legend Division' };
+/**
+ * Playlists que geram mensagem e entram no resumo semanal. Só as ranqueadas: o usuário tirou a Padrão
+ * (`unranked`) em 24/11/2026, depois de ter incluído em 10/11/2026. Os nomes em pt-BR valem sem o config.
+ */
+export const R6_PLAYLISTS = { ranked: 'Ranqueada', 'legend-division': 'Legend Division' };
+/** Dados já guardados: descarta só quem tem playlist conhecida fora das ranqueadas (ex.: Padrão). */
+export const isIgnoredR6Playlist = playlist => typeof playlist === 'string' && playlist !== '' && !Object.hasOwn(R6_PLAYLISTS, playlist);
 /** Plataformas conhecidas, usadas enquanto o /v2/config não responde. */
 export const R6_FALLBACK_PLATFORMS = [
   { slug: 'pc', display: 'PC' }, { slug: 'playstation', display: 'PlayStation' }, { slug: 'xbox', display: 'Xbox' },

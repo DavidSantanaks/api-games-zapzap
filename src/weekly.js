@@ -1,6 +1,7 @@
 import { MessageConfigError, render, selectIndex, splitPlayerName, validateText } from './message.js';
 import { R6_CREDIT } from './r6-message.js';
 import { isIgnoredLolMode } from './game-mode.js';
+import { isIgnoredR6Playlist } from './r6.js';
 
 const GAME_LABELS = { lol: 'LOL', cs2: 'CS2', r6: 'R6' };
 // Crédito exigido pelo provedor de dados, acrescentado ao fim do resumo do jogo.
@@ -385,8 +386,10 @@ export function playerDisplayName(player) {
 /** Estatísticas da semana de cada jogador ativo, inclusive quem não jogou. */
 export function summarizeWeek(players, matches) {
   return players.map(player => {
-    // Partidas de Arena guardadas antes do filtro também ficam fora da contagem.
-    const own = matches.filter(match => match.playerId === player.id && !((match.game || 'lol') === 'lol' && isIgnoredLolMode(match)))
+    // Partidas guardadas antes dos filtros também ficam fora da contagem: Arena no LoL e Padrão no R6.
+    const own = matches.filter(match => match.playerId === player.id
+      && !((match.game || 'lol') === 'lol' && isIgnoredLolMode(match))
+      && !(match.game === 'r6' && isIgnoredR6Playlist(match.playlist)))
       .sort((a, b) => String(a.endedAt).localeCompare(String(b.endedAt)));
     const stats = { wins: 0, losses: 0, draws: 0, kills: 0, deaths: 0, assists: 0 };
     for (const match of own) {

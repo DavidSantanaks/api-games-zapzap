@@ -28,7 +28,7 @@ test('R6 messages render variables, N/A and the fixed Stats.cc credit', () => {
   // O crédito não depende do modelo: um modelo editado sem ele continua com o rodapé.
   const config = r6Messages.defaultConfig();
   config.templates = [{ id: 'curto', name: 'Curto', enabled: true, text: '{{player}} {{pontos}} {{rank}} {{hs}}' }];
-  const unranked = normalizeR6Match(r6Item(M2, { playlist: 'unranked', ranked_session: null }, { headshots: null }));
+  const unranked = normalizeR6Match(r6Item(M2, { playlist: 'legend-division', ranked_session: null, legend_session: null }, { headshots: null }));
   assert.equal(r6Messages.formatMessage(unranked, { config }).message, `AmigoR6 N/A N/A N/A\n\n${R6_CREDIT}`);
   for (const scenario of ['feed', 'normal', 'carry']) assert.equal(r6Messages.createPreview(scenario).category, scenario);
   assert.throws(() => r6Messages.validateConfig({ ...config, templates: [{ ...config.templates[0], text: '{{lane}}' }] }), /variável não permitida/);
