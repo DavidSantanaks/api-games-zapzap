@@ -31,7 +31,7 @@
 
 ## Recursos
 
-- 🎮 **Três jogos:** League of Legends (Ranqueada Solo/Duo, Flex, Normal e ARAM), Counter-Strike 2 (Premier e Competitivo) e Rainbow Six Siege (Ranqueada, Padrão e Legend Division).
+- 🎮 **Três jogos:** League of Legends (Ranqueada Solo/Duo, Flex, Normal e ARAM), Counter-Strike 2 (Premier e Competitivo) e Rainbow Six Siege (Ranqueada e Legend Division).
 - 📲 **Envio automático ao WhatsApp:** conecte por QR Code, escolha o grupo e cada partida nova chega com o placar.
 - 😈 **Zoeira pelo KDA:** o comentário muda conforme o desempenho, e elogio só aparece em caso raro.
 - ✍️ **Editor visual de mensagens:** variáveis clicáveis, várias variações por jogo, frases editáveis e prévia em tempo real.
@@ -262,7 +262,7 @@ O R6 usa a [API da stats.cc](https://api.stats.cc/siege/docs) (`https://api.stat
 
 - **Cadastro:** `GET /v2/profiles/{plataforma}/{nick}` devolve o `profile_id` (UUID), que é o que fica salvo. Um perfil que a stats.cc nunca buscou pode responder `unknown_profile`; o app tenta de novo uma vez após alguns segundos. Perfis ocultos pelo dono (`hidden_profile`) não são cadastrados e, se forem ocultados depois, o player é pausado automaticamente.
 - **Partidas:** `GET /v2/profiles/{id}/matches?after=<última partida>` traz só as partidas novas. A partida mais recente no cadastro vira referência: **nada de histórico antigo é buscado** (a stats.cc pede para não fazer backfill). A stats.cc atualiza as partidas até 5 minutos depois do fim.
-- **Filas que contam:** `ranked` (Ranqueada), `unranked` (Padrão) e `legend-division` (Legend Division). Partida Rápida, eventos, arcade, personalizadas e partidas canceladas são ignoradas.
+- **Filas que contam:** só as ranqueadas: `ranked` (Ranqueada) e `legend-division` (Legend Division). Padrão (`unranked`), Partida Rápida, eventos, arcade, personalizadas e partidas canceladas são ignoradas.
 - **Nomes:** mapas, ranks e plataformas vêm em slug e são resolvidos pelo `GET /v2/config` (sem chave, com cache de 12 horas).
 - **Limites:** o app respeita os cabeçalhos `RateLimit-*` e o `Retry-After`. Um `429` ou `503` da stats.cc pausa só as consultas do R6; LoL, CS2 e a fila do WhatsApp continuam. Sem os escopos `profiles` e `matches`, a API responde `403 missing_scope` e o erro aparece no player.
 - **Atualização forçada:** o `POST /v2/profiles/{id}/update` não é usado; o intervalo de consulta normal já pega as partidas logo depois que a stats.cc as processa.
